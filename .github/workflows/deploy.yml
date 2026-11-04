@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push replaces a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # The Pages site lives at https://rmcbain21.github.io/recipe-tracker/
+  BASE_PATH: /recipe-tracker/
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          # Pinned while 10.0.403 fails to download (HTTP 409); go back to 10.0.x once it's fixed.
+          dotnet-version: 10.0.402
+
+      - name: Test
+        run: dotnet test RecipeTracker.slnx
+
+      # Set the base path before publishing: the service worker's asset
+      # manifest holds a hash of index.html, so it can't be edited afterwards.
+      - name: Set base path
+        run: sed -i 's|<base href="/" />|<base href="${{ env.BASE_PATH }}" />|' src/RecipeTracker.Web/wwwroot/index.html
+
+      - name: Publish
+        run: dotnet publish src/RecipeTracker.Web -c Release -o publish
+
+      # GitHub Pages serves 404.html for unknown paths, so deep links and
+      # reloads of a sub-page (such as /recipes/12) still start the app.
+      - name: Add SPA fallback
+        run: |
+          cp publish/wwwroot/index.html publish/wwwroot/404.html
+          touch publish/wwwroot/.nojekyll
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

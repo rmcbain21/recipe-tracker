@@ -1,0 +1,76 @@
+@inherits LayoutComponentBase
+@inject IJSRuntime JS
+
+<MudThemeProvider @ref="_themeProvider" Theme="AppTheme.Theme" IsDarkMode="_deviceIsDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<CascadingValue Value="_deviceIsDark" Name="IsDarkMode">
+    <MudLayout>
+        <MudAppBar Elevation="1" Dense="true">
+            <MudText Typo="Typo.h6">Recipe Tracker</MudText>
+            <MudSpacer />
+        </MudAppBar>
+
+        @* Navigation appears once there is more than one top-level destination (the Shopping List is next). *@
+        @if (NavItem.All.Count > 1)
+        {
+            @* Tablet and desktop: navigation drawer *@
+            <MudHidden Breakpoint="Breakpoint.Xs">
+                <MudDrawer Open="true" Variant="DrawerVariant.Persistent" ClipMode="DrawerClipMode.Always" Elevation="1">
+                    <MudNavMenu Class="pt-2">
+                        @foreach (var item in NavItem.All)
+                        {
+                            <MudNavLink Href="@item.Href" Match="@item.Match" Icon="@item.Icon">@item.Title</MudNavLink>
+                        }
+                    </MudNavMenu>
+                </MudDrawer>
+            </MudHidden>
+        }
+
+        <MudMainContent>
+            <MudContainer MaxWidth="MaxWidth.Large" Class="pt-4 main-content">
+                @Body
+            </MudContainer>
+        </MudMainContent>
+
+        @if (NavItem.All.Count > 1)
+        {
+            @* Phone: bottom navigation *@
+            <MudHidden Breakpoint="Breakpoint.SmAndUp">
+                <BottomNav />
+            </MudHidden>
+        }
+    </MudLayout>
+</CascadingValue>
+
+@code {
+    private MudThemeProvider _themeProvider = default!;
+    private bool _deviceIsDark;
+    private string? _statusBarColour;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Match the device's dark mode, and follow it if it changes while the app is open.
+            _deviceIsDark = await _themeProvider.GetSystemDarkModeAsync();
+            await _themeProvider.WatchSystemDarkModeAsync(isDark =>
+            {
+                _deviceIsDark = isDark;
+                return InvokeAsync(StateHasChanged);
+            });
+            StateHasChanged();
+        }
+
+        // The phone's status bar takes the top bar's colour.
+        var theme = AppTheme.Theme;
+        var barColour = (_deviceIsDark ? theme.PaletteDark.AppbarBackground : theme.PaletteLight.AppbarBackground).ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
+        if (barColour != _statusBarColour)
+        {
+            _statusBarColour = barColour;
+            await JS.InvokeVoidAsync("setThemeColor", barColour);
+        }
+    }
+}

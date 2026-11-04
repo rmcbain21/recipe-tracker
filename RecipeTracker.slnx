@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RecipeTracker.Core/RecipeTracker.Core.csproj" />
+    <Project Path="src/RecipeTracker.Web/RecipeTracker.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RecipeTracker.Core.Tests/RecipeTracker.Core.Tests.csproj" />
+  </Folder>
+</Solution>

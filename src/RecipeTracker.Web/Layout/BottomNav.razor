@@ -1,0 +1,9 @@
+<MudPaper Class="bottom-nav" Elevation="8" Square="true">
+    @foreach (var item in NavItem.All)
+    {
+        <NavLink class="bottom-nav-item" href="@item.Href" Match="@item.Match">
+            <MudIcon Icon="@item.Icon" />
+            <span>@item.Title</span>
+        </NavLink>
+    }
+</MudPaper>

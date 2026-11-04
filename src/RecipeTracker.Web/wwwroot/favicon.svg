@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#B5452B"/>
+  <!-- A pot: lid knob, lid, body and two handles -->
+  <rect x="236" y="118" width="40" height="28" rx="10" fill="#FFF7F2"/>
+  <path d="M128 196 Q256 128 384 196 Z" fill="#FFF7F2"/>
+  <rect x="140" y="214" width="232" height="170" rx="28" fill="#FFF7F2"/>
+  <rect x="96" y="238" width="56" height="28" rx="14" fill="#FFF7F2"/>
+  <rect x="360" y="238" width="56" height="28" rx="14" fill="#FFF7F2"/>
+  <rect x="140" y="272" width="232" height="18" fill="#5E7D3A"/>
+</svg>
