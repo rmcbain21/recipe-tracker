@@ -130,3 +130,26 @@ h1:focus {
     outline: none;
 }
 
+
+/* The + button floats above the bottom navigation on a phone, and in the corner on bigger screens */
+.add-fab {
+    position: fixed;
+    right: 16px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    z-index: var(--mud-zindex-appbar);
+}
+
+@media (min-width: 600px) {
+    .add-fab {
+        bottom: 24px;
+    }
+}
+
+/* A Recipe row opens it */
+.recipe-row {
+    cursor: pointer;
+}
+
+    .recipe-row:hover {
+        background-color: var(--mud-palette-action-default-hover);
+    }

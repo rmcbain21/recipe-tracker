@@ -1,0 +1,40 @@
+@* Asks for a name (a new Recipe's title). Returns the name typed, or cancels. *@
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="@Label" AutoFocus="true" Immediate="true" OnKeyUp="OnKeyUp" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">@SaveText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string CurrentName { get; set; } = "";
+
+    [Parameter]
+    public string SaveText { get; set; } = "Save";
+
+    [Parameter]
+    public string Label { get; set; } = "Name";
+
+    private string? _name;
+
+    protected override void OnInitialized() => _name = CurrentName;
+
+    private void OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            Save();
+        }
+    }
+
+    private void Save() => MudDialog.Close(DialogResult.Ok(_name ?? ""));
+
+    private void Cancel() => MudDialog.Cancel();
+}

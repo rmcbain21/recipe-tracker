@@ -1,11 +1,67 @@
 @page "/"
+@inject AppCore App
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 <PageTitle>Recipes</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4" tabindex="-1" HtmlTag="h1">Recipes</MudText>
 
-<MudPaper Class="pa-6 d-flex flex-column align-center gap-2" Elevation="0" Outlined="true">
-    <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" Color="Color.Primary" />
-    <MudText Typo="Typo.body1">No Recipes yet.</MudText>
-    <MudText Typo="Typo.body2" Color="Color.Secondary">Capturing a Recipe is coming next.</MudText>
-</MudPaper>
+@if (_recipes is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_recipes.Count == 0)
+{
+    <MudPaper Class="pa-6 d-flex flex-column align-center gap-2" Elevation="0" Outlined="true">
+        <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" Color="Color.Primary" />
+        <MudText Typo="Typo.body1">No Recipes yet.</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Tap + to add one.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper>
+        @foreach (var recipe in _recipes)
+        {
+            <div class="pa-3">
+                <MudText>@recipe.Title</MudText>
+            </div>
+            <MudDivider />
+        }
+    </MudPaper>
+}
+
+<MudFab Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Add" Class="add-fab" aria-label="New Recipe"
+        OnClick="AddAsync" />
+
+@code {
+    private IReadOnlyList<Recipe>? _recipes;
+
+    protected override async Task OnInitializedAsync() => _recipes = await App.Recipes.ListRecipesAsync();
+
+    private async Task AddAsync()
+    {
+        var parameters = new DialogParameters<NameDialog>
+        {
+            { d => d.Label, "Title" },
+            { d => d.SaveText, "Add" },
+        };
+        var dialog = await DialogService.ShowAsync<NameDialog>("New Recipe", parameters);
+        var result = await dialog.Result;
+        if (result is not { Canceled: false, Data: string title })
+        {
+            return;
+        }
+
+        try
+        {
+            await App.Recipes.AddRecipeAsync(title);
+            _recipes = await App.Recipes.ListRecipesAsync();
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+}
