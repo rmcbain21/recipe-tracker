@@ -4,14 +4,14 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The core depends only on the record store and clock ports; tests use an in-memory record store and a controllable clock.
 - [x] Every record has a GUID `id`, a UTC `updatedAt` from the clock and a `deleted` tombstone flag.
 - [x] Through the core API I can add a Recipe (title only for now) and list Recipes; tests cover adding, listing and persistence.
 - [x] The Dexie adapter stores records in one `records` table keyed by `[table+id]`; data survives a reload.
 - [x] The home page lists Recipes by title and has a "＋" button that adds one.
-- [ ] A Release publish installs from Chrome on Android and works offline after the first visit (the service worker caches Dexie too; `.mjs` is in its cache list).
+- [x] A Release publish installs from Chrome on Android and works offline after the first visit (the service worker caches Dexie too; `.mjs` is in its cache list).
 
 ## Comments
 
@@ -20,3 +20,5 @@
 Still to check by hand: data surviving a reload in the browser, and installing from Chrome on Android and working offline after the first visit. Once those pass, tick the last two boxes.
 
 **2026-11-06 (human):** Ran the app: a Recipe I added was still there after a reload. The Android install and offline check is still to do.
+
+**2026-11-06 (human):** Installed the Release build from Chrome on Android; it runs, and works offline (airplane mode, reopened). All boxes ticked.
