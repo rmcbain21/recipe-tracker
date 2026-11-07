@@ -1,4 +1,5 @@
 using RecipeTracker.Core.Ingredients;
+using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Ports;
 using RecipeTracker.Core.Recipes;
 
@@ -12,7 +13,7 @@ public sealed class AppCore
 {
     public AppCore(IRecordStore store, IClock clock)
     {
-        Recipes = new RecipeCatalogue(store, clock);
+        Recipes = new RecipeCatalogue(store, clock, new RuleBasedRecipeParser());
         Ingredients = new IngredientCatalogue(store);
     }
 

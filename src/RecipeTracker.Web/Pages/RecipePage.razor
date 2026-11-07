@@ -29,6 +29,20 @@ else
         </MudMenu>
     </div>
 
+    @if (recipe.IsDraft)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2 draft-note">
+            This is a Draft. <MudLink Href="@($"recipes/{recipe.Id}/edit")">Finish reviewing it</MudLink> to cook from it.
+        </MudAlert>
+    }
+
+    @if (recipe.Source is { Kind: SourceKind.Website, Url.Length: > 0 } source)
+    {
+        <MudText Typo="Typo.body2" Class="mb-2 recipe-source">
+            From <MudLink Href="@source.Url" Target="_blank" rel="noopener">@(Uri.TryCreate(source.Url, UriKind.Absolute, out var uri) ? uri.Host : source.Url)</MudLink>
+        </MudText>
+    }
+
     @if (recipe.Description.Length > 0)
     {
         <MudText Typo="Typo.body1" Class="mb-2 recipe-description">@recipe.Description</MudText>

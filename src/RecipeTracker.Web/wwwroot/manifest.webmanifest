@@ -7,6 +7,15 @@
   "background_color": "#FBF6EF",
   "theme_color": "#8F3420",
   "prefer_related_applications": false,
+  "share_target": {
+    "action": "./capture",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "icons": [
     {
       "src": "icon-512.png",

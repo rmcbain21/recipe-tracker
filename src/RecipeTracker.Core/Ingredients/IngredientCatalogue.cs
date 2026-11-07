@@ -49,7 +49,17 @@ public sealed class IngredientCatalogue
     }
 
     internal static Ingredient? FindByName(IEnumerable<Ingredient> ingredients, string name) =>
-        ingredients.FirstOrDefault(ingredient => Names(ingredient).Any(n => IngredientNames.Same(n, name)));
+        ingredients.FirstOrDefault(ingredient => IngredientNames.Same(ingredient.Name, name))
+        ?? ingredients.FirstOrDefault(ingredient => ingredient.Aliases.Any(alias => IngredientNames.Same(alias, name)));
+
+    /// <summary>The Ingredient to suggest for a parsed name, and whether it matched by name, by alias, or is new.</summary>
+    internal static (Ingredient? Ingredient, IngredientMatch Match) Suggest(IEnumerable<Ingredient> ingredients, string name)
+    {
+        var found = FindByName(ingredients, name);
+        return found is null
+            ? (null, IngredientMatch.New)
+            : (found, IngredientNames.Same(found.Name, name) ? IngredientMatch.Matched : IngredientMatch.Alias);
+    }
 
     private static IEnumerable<string> Names(Ingredient ingredient) => ingredient.Aliases.Prepend(ingredient.Name);
 

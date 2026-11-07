@@ -1,0 +1,61 @@
+@page "/capture"
+@using RecipeTracker.Core.Recipes
+@inject AppCore App
+
+<PageTitle>Capture</PageTitle>
+
+@if (_editor is null)
+{
+    <MudText Typo="Typo.h5" HtmlTag="h1" Class="mb-2">Capture a Recipe</MudText>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+        Paste a recipe from a website, a video description or a book page (Google Lens can copy one).
+        You'll check everything before it's saved.
+    </MudText>
+    <MudTextField @bind-Value="_text" Label="Recipe text" Variant="Variant.Outlined" Lines="12" MaxLines="30"
+                  Sizing="InputSizing.Auto" Immediate="true" AutoFocus="@(string.IsNullOrEmpty(Text))" Class="mb-3 capture-text" />
+    <div class="d-flex flex-wrap justify-end gap-2">
+        <MudButton Href="recipes/new" Variant="Variant.Text">Type it in instead</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoFixHigh"
+                   Disabled="@string.IsNullOrWhiteSpace(_text)" OnClick="ReadAsync">Read recipe</MudButton>
+    </div>
+}
+else
+{
+    <div class="d-flex align-center mb-2">
+        <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">Review</MudText>
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => _editor = null">Back to text</MudButton>
+    </div>
+    @if (_editor.Source is { Url.Length: > 0 } source)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">From @source.Url</MudText>
+    }
+    <RecipeSaveActions Editor="_editor" Finishing="true" Class="mb-3" />
+    <RecipeEditorForm Editor="_editor" />
+    <RecipeSaveActions Editor="_editor" Finishing="true" Class="mb-6" />
+}
+
+@code {
+    // Filled in when another app shares to Recipe Tracker (the web manifest's share_target).
+    [SupplyParameterFromQuery]
+    public string? Text { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Title { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Url { get; set; }
+
+    private string _text = "";
+    private RecipeEditor? _editor;
+
+    protected override void OnParametersSet()
+    {
+        // Chrome puts a shared page's link at the end of the text; reading the recipe takes it out as the Source.
+        if (!string.IsNullOrEmpty(Text))
+        {
+            _text = Text;
+        }
+    }
+
+    private async Task ReadAsync() => _editor = await App.Recipes.CaptureAsync(_text, Title, Url);
+}

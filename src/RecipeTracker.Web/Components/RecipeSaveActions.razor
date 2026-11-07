@@ -1,0 +1,51 @@
+@* Cancel, Save as Draft, and Save or Finish for a Recipe editor. Saving opens the recipe page; a rule the Recipe breaks shows as a message. *@
+@using RecipeTracker.Core.Recipes
+@inject AppCore App
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<div class="d-flex flex-wrap justify-end gap-2 @Class">
+    <MudButton OnClick="Cancel" Disabled="_saving">Cancel</MudButton>
+    <MudButton Variant="Variant.Outlined" OnClick="() => SaveAsync(asDraft: true)" Disabled="_saving">Save as Draft</MudButton>
+    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="() => SaveAsync(asDraft: false)" Disabled="_saving">
+        @(Finishing ? "Finish" : "Save")
+    </MudButton>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RecipeEditor Editor { get; set; } = default!;
+
+    /// <summary>True when the main button finishes a Draft or a capture, rather than saving an edit.</summary>
+    [Parameter]
+    public bool Finishing { get; set; }
+
+    /// <summary>Where Cancel goes.</summary>
+    [Parameter]
+    public string CancelHref { get; set; } = "";
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    private bool _saving;
+
+    private async Task SaveAsync(bool asDraft)
+    {
+        _saving = true;
+        try
+        {
+            var recipe = asDraft ? await App.Recipes.SaveDraftAsync(Editor) : await App.Recipes.SaveAsync(Editor);
+            Navigation.NavigateTo($"recipes/{recipe.Id}", replace: true);
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo(CancelHref, replace: true);
+}

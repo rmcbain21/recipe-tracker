@@ -1,0 +1,124 @@
+@* The fields of a Recipe being typed, edited or reviewed after capture. Changes stay in the editor until the page saves it. *@
+@using RecipeTracker.Core.Ingredients
+@using RecipeTracker.Core.Quantities
+@using RecipeTracker.Core.Recipes
+
+@if (Editor.HasUnconfirmedMatches)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3 confirm-matches"
+              ContentAlignment="HorizontalAlignment.Left">
+        <div class="d-flex align-center flex-wrap gap-2">
+            <span>Check each line's Ingredient, then confirm it or pick another.</span>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" OnClick="Editor.ConfirmAllMatches">Confirm all</MudButton>
+        </div>
+    </MudAlert>
+}
+
+<MudTextField @bind-Value="Editor.Title" Label="Title" Immediate="true" AutoFocus="AutoFocusTitle" Class="mb-2" />
+<MudTextField @bind-Value="Editor.Description" Label="Description" Lines="2" Sizing="InputSizing.Auto" Class="mb-2" />
+
+<div class="d-flex flex-wrap gap-3 mb-2">
+    <MudNumericField T="decimal?" @bind-Value="Editor.YieldAmount" Label="Makes" Min="0" HideSpinButtons="true" Class="field-narrow" />
+    <MudTextField @bind-Value="Editor.YieldLabel" Label="servings, cookies…" Class="field-medium" />
+</div>
+<div class="d-flex flex-wrap gap-3 mb-4">
+    <MudNumericField T="int?" @bind-Value="Editor.PrepMinutes" Label="Prep (min)" Min="0" HideSpinButtons="true" Class="field-narrow" />
+    <MudNumericField T="int?" @bind-Value="Editor.CookMinutes" Label="Cook (min)" Min="0" HideSpinButtons="true" Class="field-narrow" />
+    <MudNumericField T="int?" @bind-Value="Editor.TotalMinutes" Label="Total (min)" Min="0" HideSpinButtons="true" Class="field-narrow" />
+</div>
+
+<MudText Typo="Typo.h6" HtmlTag="h2">Ingredients</MudText>
+@foreach (var group in Editor.Sections)
+{
+    <MudPaper Outlined="@(group.IsHeaded)" Elevation="0" Class="@(group.IsHeaded ? "pa-2 mb-2" : "mb-2")" @key="group.Id">
+        @if (group.IsHeaded)
+        {
+            <div class="d-flex align-center">
+                <MudTextField @bind-Value="group.Heading" Label="Section heading" Placeholder="For the dough" Class="flex-grow-1" />
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move section up"
+                               OnClick="() => Editor.MoveSection(group, -1)" />
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Move section down"
+                               OnClick="() => Editor.MoveSection(group, +1)" />
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" aria-label="Remove heading"
+                               title="Remove the heading; its lines stay" OnClick="() => Editor.RemoveSection(group)" />
+            </div>
+        }
+        @foreach (var line in group.Lines)
+        {
+            <div class="@(line.IsConfirmed ? "ingredient-line-edit" : "ingredient-line-edit unconfirmed")" @key="line.Id">
+                @if (line.OriginalText.Length > 0)
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block original-text">“@line.OriginalText”</MudText>
+                }
+                @if (line.Match is IngredientMatch match)
+                {
+                    var (chipText, chipColor) = MatchChip(match);
+                    <div class="d-flex align-center gap-2">
+                        <MudChip T="string" Size="Size.Small" Color="chipColor" Variant="Variant.Outlined" Class="ml-0">@chipText</MudChip>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Check" OnClick="line.Confirm">Confirm</MudButton>
+                    </div>
+                }
+                <div class="d-flex gap-2 align-end">
+                    <MudTextField @bind-Value="line.QuantityText" Label="Qty" Immediate="true" Class="field-qty"
+                                  Validation="@(new Func<string, string?>(QuantityError))" />
+                    <MudTextField @bind-Value="line.Unit" Label="Unit" Class="field-unit" />
+                    <IngredientPicker @bind-Value="line.Ingredient" Class="flex-grow-1" />
+                </div>
+                <div class="d-flex gap-2 align-center">
+                    <MudTextField @bind-Value="line.Preparation" Label="Preparation" Placeholder="diced" Class="flex-grow-1" />
+                    <MudCheckBox @bind-Value="line.Optional" Label="Optional" Dense="true" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move line up"
+                                   OnClick="() => Editor.MoveLine(line, -1)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Move line down"
+                                   OnClick="() => Editor.MoveLine(line, +1)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Remove line"
+                                   OnClick="() => Editor.RemoveLine(line)" />
+                </div>
+            </div>
+        }
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="() => Editor.AddLine(group)">
+            Add line@(group.IsHeaded ? $" to {group.Heading}" : "")
+        </MudButton>
+    </MudPaper>
+}
+<MudButton StartIcon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small" Class="mb-4" OnClick="() => Editor.AddSection()">
+    Add section
+</MudButton>
+
+<MudText Typo="Typo.h6" HtmlTag="h2">Steps</MudText>
+@for (var index = 0; index < Editor.Steps.Count; index++)
+{
+    var step = Editor.Steps[index];
+    var number = index + 1;
+    <div class="d-flex align-start gap-2 mb-1" @key="step.Id">
+        <MudText Typo="Typo.h6" Class="step-number">@number</MudText>
+        <MudTextField @bind-Value="step.Text" Label="@($"Step {number}")" Lines="2" Sizing="InputSizing.Auto" Class="flex-grow-1" />
+        <div class="d-flex flex-column">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move step up"
+                           OnClick="() => Editor.MoveStep(step, -1)" />
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Move step down"
+                           OnClick="() => Editor.MoveStep(step, +1)" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Remove step"
+                           OnClick="() => Editor.RemoveStep(step)" />
+        </div>
+    </div>
+}
+<MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mb-4" OnClick="() => Editor.AddStep()">Add step</MudButton>
+
+@code {
+    [Parameter, EditorRequired]
+    public RecipeEditor Editor { get; set; } = default!;
+
+    [Parameter]
+    public bool AutoFocusTitle { get; set; }
+
+    private static string? QuantityError(string text) =>
+        Quantity.TryParse(text, out _) ? null : "Try 2, 1½, 1 1/2 or 2-3";
+
+    private static (string Text, Color Color) MatchChip(IngredientMatch match) => match switch
+    {
+        IngredientMatch.Matched => ("Matched", Color.Success),
+        IngredientMatch.Alias => ("Alias", Color.Info),
+        _ => ("New", Color.Warning),
+    };
+}

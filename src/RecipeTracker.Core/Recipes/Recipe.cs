@@ -4,13 +4,21 @@ namespace RecipeTracker.Core.Recipes;
 
 /// <summary>
 /// A dish the Cook has captured, with its Ingredient Sections, Ingredient Lines and Steps nested
-/// inside it. Lists are kept in the order the Cook sees them. Source, Tags, Notes and Ingredient
-/// Uses arrive in later slices.
+/// inside it. Lists are kept in the order the Cook sees them. Tags, Notes and Ingredient Uses
+/// arrive in later slices.
 /// </summary>
 public sealed record Recipe : StoredRecord
 {
     /// <summary>What the Cook calls it, such as "Weeknight chili". Never blank.</summary>
     public required string Title { get; init; }
+
+    /// <summary>
+    /// True for a Recipe saved before its review was finished. A Draft's lines may have no
+    /// Ingredient yet, or one that's only suggested.
+    /// </summary>
+    public bool IsDraft { get; init; }
+
+    public Source? Source { get; init; }
 
     public string Description { get; init; } = "";
 
@@ -73,7 +81,17 @@ public sealed record IngredientLine
     /// <summary>The unit as written, such as "cups" or "cloves"; blank for a count ("2 eggs").</summary>
     public string Unit { get; init; } = "";
 
-    public required string IngredientId { get; init; }
+    /// <summary>The shared Ingredient. Only a Draft's line can have none.</summary>
+    public string? IngredientId { get; init; }
+
+    /// <summary>
+    /// On a Draft, true when the Ingredient (or <see cref="SuggestedName"/>) is the capture's
+    /// suggestion and the Cook hasn't confirmed it yet.
+    /// </summary>
+    public bool MatchUnconfirmed { get; init; }
+
+    /// <summary>On an unconfirmed line, the Ingredient name the parser read, such as "scallions".</summary>
+    public string SuggestedName { get; init; } = "";
 
     /// <summary>How it's prepared, such as "diced" or "softened".</summary>
     public string Preparation { get; init; } = "";

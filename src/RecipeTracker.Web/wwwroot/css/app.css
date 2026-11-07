@@ -203,3 +203,13 @@ h1:focus {
     min-width: 1.5rem;
     padding-top: 1.25rem;
 }
+
+/* Capture review */
+.ingredient-line-edit.unconfirmed {
+    border-left: 3px solid var(--mud-palette-warning);
+    padding-left: 0.5rem;
+}
+
+.original-text {
+    font-style: italic;
+}

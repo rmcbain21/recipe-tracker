@@ -33,9 +33,18 @@ public sealed class RecipeView
 
     private static ShownLine ShowLine(IngredientLine line, IReadOnlyDictionary<string, Ingredient> ingredients)
     {
-        var name = ingredients.TryGetValue(line.IngredientId, out var ingredient) ? ingredient.Name : "Unknown Ingredient";
+        var name = line.IngredientId is null ? line.SuggestedName
+            : ingredients.TryGetValue(line.IngredientId, out var ingredient) ? ingredient.Name
+            : "Unknown Ingredient";
+        if (name.Length == 0)
+        {
+            name = line.OriginalText;
+        }
+
         var amount = string.Join(" ", new[] { line.Quantity?.ToString(), line.Unit }.Where(part => !string.IsNullOrEmpty(part)));
-        var text = amount.Length == 0 ? name : $"{amount} {name}";
+
+        // "pinch of salt" rather than "pinch salt" when there's a unit but no number.
+        var text = amount.Length == 0 ? name : line.Quantity is null ? $"{amount} of {name}" : $"{amount} {name}";
         if (line.Preparation.Length > 0)
         {
             text += $", {line.Preparation}";

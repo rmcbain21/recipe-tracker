@@ -22,6 +22,8 @@ public sealed class RecipeEditor
         }
 
         Title = original.Title;
+        IsDraft = original.IsDraft;
+        Source = original.Source;
         Description = original.Description;
         YieldAmount = original.Yield?.Amount;
         YieldLabel = original.Yield?.Label ?? "";
@@ -37,16 +39,27 @@ public sealed class RecipeEditor
         foreach (var line in original.Lines)
         {
             var section = _sections.FirstOrDefault(s => s.Heading is not null && s.Id == line.SectionId) ?? _sections[0];
-            var name = ingredients.TryGetValue(line.IngredientId, out var ingredient) ? ingredient.Name : "Unknown Ingredient";
-            section.LinesList.Add(new EditedLine(line.Id)
+            var edited = new EditedLine(line.Id)
             {
                 QuantityText = line.Quantity?.ToString() ?? "",
                 Unit = line.Unit,
-                Ingredient = IngredientChoice.Existing(line.IngredientId, name),
                 Preparation = line.Preparation,
                 Optional = line.Optional,
                 OriginalText = line.OriginalText,
-            });
+                SuggestedName = line.SuggestedName,
+            };
+            var choice = ChoiceFor(line, ingredients);
+            if (line.MatchUnconfirmed && choice is not null)
+            {
+                edited.Suggest(choice, choice.IsNew ? IngredientMatch.New
+                    : IngredientNames.Same(choice.Name, line.SuggestedName) ? IngredientMatch.Matched : IngredientMatch.Alias);
+            }
+            else
+            {
+                edited.Ingredient = choice;
+            }
+
+            section.LinesList.Add(edited);
         }
 
         _steps.AddRange(original.Steps.Select(step => new EditedStep(step.Id) { Text = step.Text }));
@@ -60,7 +73,24 @@ public sealed class RecipeEditor
 
     public string Title { get; set; } = "";
 
+    /// <summary>True if the Recipe was last saved as a Draft. A new Recipe isn't a Draft until it's saved as one.</summary>
+    public bool IsDraft { get; }
+
+    public Source? Source { get; set; }
+
     public string Description { get; set; } = "";
+
+    /// <summary>True if any line's Ingredient is still only a suggestion.</summary>
+    public bool HasUnconfirmedMatches => _sections.SelectMany(s => s.LinesList).Any(line => line.Ingredient is not null && !line.IsConfirmed);
+
+    /// <summary>Accepts every suggested Ingredient as it is.</summary>
+    public void ConfirmAllMatches()
+    {
+        foreach (var line in _sections.SelectMany(s => s.LinesList))
+        {
+            line.Confirm();
+        }
+    }
 
     public decimal? YieldAmount { get; set; }
 
@@ -176,6 +206,17 @@ public sealed class RecipeEditor
         ?? throw new ArgumentException("That line isn't in this Recipe.", nameof(line));
 
     private static string NewId() => Guid.NewGuid().ToString();
+
+    private static IngredientChoice? ChoiceFor(IngredientLine line, IReadOnlyDictionary<string, Ingredient> ingredients)
+    {
+        if (line.IngredientId is not null)
+        {
+            var name = ingredients.TryGetValue(line.IngredientId, out var ingredient) ? ingredient.Name : "Unknown Ingredient";
+            return IngredientChoice.Existing(line.IngredientId, name);
+        }
+
+        return line.SuggestedName.Length > 0 ? IngredientChoice.New(line.SuggestedName) : null;
+    }
 }
 
 /// <summary>An ingredient group in a <see cref="RecipeEditor"/>: an Ingredient Section, or the lines before the first one.</summary>
@@ -214,14 +255,51 @@ public sealed class EditedLine
 
     public string Unit { get; set; } = "";
 
-    /// <summary>The Ingredient picked, or null if none has been picked yet.</summary>
-    public IngredientChoice? Ingredient { get; set; }
+    private IngredientChoice? _ingredient;
+
+    /// <summary>
+    /// The Ingredient picked, or null if none has been picked yet. Picking one, even the
+    /// suggested one, confirms it.
+    /// </summary>
+    public IngredientChoice? Ingredient
+    {
+        get => _ingredient;
+        set
+        {
+            _ingredient = value;
+            IsConfirmed = true;
+            Match = null;
+        }
+    }
+
+    /// <summary>False while the Ingredient is the capture's suggestion and the Cook hasn't confirmed it.</summary>
+    public bool IsConfirmed { get; private set; } = true;
+
+    /// <summary>How the suggested Ingredient matched, shown until the Cook confirms or changes it; null otherwise.</summary>
+    public IngredientMatch? Match { get; private set; }
+
+    /// <summary>Accepts the suggested Ingredient.</summary>
+    public void Confirm()
+    {
+        IsConfirmed = true;
+        Match = null;
+    }
+
+    internal void Suggest(IngredientChoice choice, IngredientMatch match)
+    {
+        _ingredient = choice;
+        IsConfirmed = false;
+        Match = match;
+    }
 
     public string Preparation { get; set; } = "";
 
     public bool Optional { get; set; }
 
     public string OriginalText { get; set; } = "";
+
+    /// <summary>On a captured line, the Ingredient name the parser read, kept so that a Draft can show how it matched.</summary>
+    public string SuggestedName { get; internal set; } = "";
 
     internal bool IsBlank =>
         string.IsNullOrWhiteSpace(QuantityText) && string.IsNullOrWhiteSpace(Unit) &&

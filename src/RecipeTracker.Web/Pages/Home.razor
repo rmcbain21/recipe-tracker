@@ -15,7 +15,7 @@ else if (_recipes.Count == 0)
     <MudPaper Class="pa-6 d-flex flex-column align-center gap-2" Elevation="0" Outlined="true">
         <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" Color="Color.Primary" />
         <MudText Typo="Typo.body1">No Recipes yet.</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Tap + to add one.</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Tap + to paste one in.</MudText>
     </MudPaper>
 }
 else
@@ -24,7 +24,15 @@ else
         <MudList T="string">
             @foreach (var recipe in _recipes)
             {
-                <MudListItem T="string" Href="@($"recipes/{recipe.Id}")" Text="@recipe.Title" />
+                <MudListItem T="string" Href="@($"recipes/{recipe.Id}")">
+                    <div class="d-flex align-center gap-2">
+                        <span>@recipe.Title</span>
+                        @if (recipe.IsDraft)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Class="draft-chip">Draft</MudChip>
+                        }
+                    </div>
+                </MudListItem>
                 <MudDivider />
             }
         </MudList>
@@ -32,7 +40,7 @@ else
 }
 
 <MudFab Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Add" Class="add-fab" aria-label="New Recipe"
-        OnClick="@(() => Navigation.NavigateTo("recipes/new"))" />
+        OnClick="@(() => Navigation.NavigateTo("capture"))" />
 
 @code {
     private IReadOnlyList<Recipe>? _recipes;
