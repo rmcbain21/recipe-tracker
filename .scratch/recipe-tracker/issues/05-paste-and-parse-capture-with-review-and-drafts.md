@@ -8,9 +8,9 @@
 
 - [x] Parser: finds the ingredient block and the steps block from headings ("Ingredients", "Instructions", "Method", "Directions") or, with no headings, from line shape (lines starting with a quantity are ingredients). Strips step numbers and bullets. A line ending in ":" inside ingredients becomes an Ingredient Section.
 - [x] Ingredient Line splitting handles unicode and typed fractions, ranges, unit words and abbreviations (cup(s), c, tbsp, T, tsp, t, oz, lb, g, kg, ml, l, clove(s), can(s), pinch, dash, stick(s)), "salt and pepper to taste", "(optional)", and preparation after a comma.
-- [ ] Ingredient matching as in the spec's behaviour rules, shown as Matched / Alias / New on each line.
+- [x] Ingredient matching as in the spec's behaviour rules, shown as Matched / Alias / New on each line.
 - [x] Table-driven tests from at least four real samples: a website copy, a YouTube description, a Google Lens book page and a messy one.
-- [ ] Drafts: saving keeps the Draft flag; a Draft lists at the top of home with a "Draft" chip; Finish checks the spec's rules.
+- [x] Drafts: saving keeps the Draft flag; a Draft lists at the top of home with a "Draft" chip; Finish checks the spec's rules.
 - [ ] The web manifest declares a `share_target` (GET, `title`/`text`/`url` params) to the Capture page, which pre-fills the text box (with any shared URL stored as a Website Source).
 
 ## Comments
@@ -26,3 +26,5 @@
 - **UI**: home ＋ now opens Capture, which has "Type it in instead" for the manual editor. The editor fields are shared by `Components/RecipeEditorForm.razor` and the save buttons by `RecipeSaveActions.razor` (Cancel / Save as Draft / Save or Finish).
 
 Still to check by hand: the capture → review → Draft / Finish flow on the phone, and Share → Recipe Tracker from Chrome and Google Lens (needs a deploy, and the installed app may need reinstalling to pick up the new manifest).
+
+**2026-11-06 (human):** Capture, review, Drafts and Finish work locally. The share target is still to check on Android after a deploy.
