@@ -4,14 +4,14 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Core: Recipe with nested Ingredient Sections, Ingredient Lines and Steps as in the spec's schema; Ingredient as its own record with aliases.
 - [x] Quantities: parse and format exact numbers, fractions ("1½", "1 1/2", "½") and ranges ("2-3", "2 to 3"), with "no quantity" allowed. Unit tests cover the formats.
 - [x] Editing: add, edit, reorder and remove Ingredient Lines, Sections and Steps; the Ingredient picker searches names and aliases and offers "New Ingredient".
 - [x] The recipe page shows title, description, Yield, Stated Times, ingredients grouped by Section, and numbered Steps.
 - [x] Deleting a Recipe tombstones it, after a confirmation.
-- [ ] Tapping a Recipe on the home page opens its recipe page (`/recipes/{id}`); deep links work.
+- [x] Tapping a Recipe on the home page opens its recipe page (`/recipes/{id}`); deep links work.
 
 ## Comments
 
@@ -24,3 +24,5 @@ UI: `/recipes/{id}` recipe page (Edit, and Delete behind a confirmation), `/reci
 Still to check by hand: the editor and picker on a phone, the recipe page, and opening a `/recipes/{id}` deep link. Once those pass, tick the Editing, recipe page and deep link boxes.
 
 **2026-11-06 (human):** The editor (sections, lines, new and existing Ingredients, reordering) and the recipe page work on the phone. The deep link check is still to do.
+
+**2026-11-06 (human):** Tapping a Recipe opens its page, and `/recipes/{id}` deep links work. All boxes ticked.
