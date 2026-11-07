@@ -1,7 +1,6 @@
 @page "/"
 @inject AppCore App
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
 <PageTitle>Recipes</PageTitle>
 
@@ -22,46 +21,21 @@ else if (_recipes.Count == 0)
 else
 {
     <MudPaper>
-        @foreach (var recipe in _recipes)
-        {
-            <div class="pa-3">
-                <MudText>@recipe.Title</MudText>
-            </div>
-            <MudDivider />
-        }
+        <MudList T="string">
+            @foreach (var recipe in _recipes)
+            {
+                <MudListItem T="string" Href="@($"recipes/{recipe.Id}")" Text="@recipe.Title" />
+                <MudDivider />
+            }
+        </MudList>
     </MudPaper>
 }
 
 <MudFab Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Add" Class="add-fab" aria-label="New Recipe"
-        OnClick="AddAsync" />
+        OnClick="@(() => Navigation.NavigateTo("recipes/new"))" />
 
 @code {
     private IReadOnlyList<Recipe>? _recipes;
 
     protected override async Task OnInitializedAsync() => _recipes = await App.Recipes.ListRecipesAsync();
-
-    private async Task AddAsync()
-    {
-        var parameters = new DialogParameters<NameDialog>
-        {
-            { d => d.Label, "Title" },
-            { d => d.SaveText, "Add" },
-        };
-        var dialog = await DialogService.ShowAsync<NameDialog>("New Recipe", parameters);
-        var result = await dialog.Result;
-        if (result is not { Canceled: false, Data: string title })
-        {
-            return;
-        }
-
-        try
-        {
-            await App.Recipes.AddRecipeAsync(title);
-            _recipes = await App.Recipes.ListRecipesAsync();
-        }
-        catch (RuleViolationException ex)
-        {
-            Snackbar.Add(ex.Message, Severity.Warning);
-        }
-    }
 }

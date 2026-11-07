@@ -1,3 +1,4 @@
+using RecipeTracker.Core.Ingredients;
 using RecipeTracker.Core.Ports;
 using RecipeTracker.Core.Recipes;
 
@@ -12,7 +13,10 @@ public sealed class AppCore
     public AppCore(IRecordStore store, IClock clock)
     {
         Recipes = new RecipeCatalogue(store, clock);
+        Ingredients = new IngredientCatalogue(store);
     }
 
     public RecipeCatalogue Recipes { get; }
+
+    public IngredientCatalogue Ingredients { get; }
 }

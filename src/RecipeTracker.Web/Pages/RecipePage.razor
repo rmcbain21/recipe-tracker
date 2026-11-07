@@ -1,0 +1,127 @@
+@page "/recipes/{RecipeId}"
+@using RecipeTracker.Core.Recipes
+@inject AppCore App
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>@(_view?.Recipe.Title ?? "Recipe")</PageTitle>
+
+<MudButton Href="./" Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Class="mb-1 ml-n2">Recipes</MudButton>
+
+@if (!_loaded)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_view is null)
+{
+    <MudText Typo="Typo.h5" HtmlTag="h1">Recipe not found</MudText>
+    <MudText Class="mud-text-secondary">It may have been deleted.</MudText>
+}
+else
+{
+    var recipe = _view.Recipe;
+    <div class="d-flex align-center">
+        <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">@recipe.Title</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Edit Recipe" Href="@($"recipes/{recipe.Id}/edit")" />
+        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true" AriaLabel="Recipe options">
+            <MudMenuItem OnClick="DeleteAsync">Delete</MudMenuItem>
+        </MudMenu>
+    </div>
+
+    @if (recipe.Description.Length > 0)
+    {
+        <MudText Typo="Typo.body1" Class="mb-2 recipe-description">@recipe.Description</MudText>
+    }
+
+    @if (recipe.Yield is not null || !recipe.StatedTimes.IsEmpty)
+    {
+        <div class="d-flex flex-wrap gap-4 mb-3 recipe-facts">
+            @if (recipe.Yield is not null)
+            {
+                @Fact("Makes", recipe.Yield.ToString())
+            }
+            @if (recipe.StatedTimes.PrepMinutes is int prep)
+            {
+                @Fact("Prep", StatedTimes.Format(prep))
+            }
+            @if (recipe.StatedTimes.CookMinutes is int cook)
+            {
+                @Fact("Cook", StatedTimes.Format(cook))
+            }
+            @if (recipe.StatedTimes.TotalMinutes is int total)
+            {
+                @Fact("Total", StatedTimes.Format(total))
+            }
+        </div>
+    }
+
+    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mt-2">Ingredients</MudText>
+    @if (_view.Ingredients.Count == 0)
+    {
+        <MudText Class="mud-text-secondary">No ingredients yet.</MudText>
+    }
+    @foreach (var group in _view.Ingredients)
+    {
+        @if (group.Heading is not null)
+        {
+            <MudText Typo="Typo.subtitle1" HtmlTag="h3" Class="mt-2 ingredient-heading">@group.Heading</MudText>
+        }
+        <ul class="ingredient-lines">
+            @foreach (var line in group.Lines)
+            {
+                <li>@line.Text</li>
+            }
+        </ul>
+    }
+
+    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mt-4">Steps</MudText>
+    @if (recipe.Steps.Count == 0)
+    {
+        <MudText Class="mud-text-secondary">No steps yet.</MudText>
+    }
+    else
+    {
+        <ol class="recipe-steps">
+            @foreach (var step in recipe.Steps)
+            {
+                <li>@step.Text</li>
+            }
+        </ol>
+    }
+}
+
+@code {
+    [Parameter]
+    public string RecipeId { get; set; } = "";
+
+    private RecipeView? _view;
+    private bool _loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _view = await App.Recipes.GetRecipeAsync(RecipeId);
+        _loaded = true;
+    }
+
+    private async Task DeleteAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete Recipe?", $"\"{_view!.Recipe.Title}\" will be deleted.", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        await App.Recipes.DeleteRecipeAsync(RecipeId);
+        Navigation.NavigateTo("", replace: true);
+    }
+
+    private static RenderFragment Fact(string label, string value) => __builder =>
+    {
+        <div>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@label</MudText>
+            <MudText Typo="Typo.body1">@value</MudText>
+        </div>
+    };
+}

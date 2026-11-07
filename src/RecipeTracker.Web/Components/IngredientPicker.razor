@@ -1,0 +1,50 @@
+@* Picks an Ingredient for a line by name or alias, or offers a new one with the name typed (ADR 0003). *@
+@using RecipeTracker.Core.Ingredients
+@inject AppCore App
+
+<MudAutocomplete T="IngredientChoice" Value="Value" ValueChanged="ValueChanged" Label="Ingredient"
+                 SearchFunc="SearchAsync" ToStringFunc="@(choice => choice?.Name)" Dense="true"
+                 ResetValueOnEmptyText="true" CoerceText="true" SelectValueOnTab="true" DebounceInterval="150"
+                 MaxItems="8" Class="@Class">
+    <ItemTemplate Context="choice">
+        @if (choice.IsNew)
+        {
+            <MudText Color="Color.Primary"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mr-1" />New Ingredient "@choice.Name"</MudText>
+        }
+        else
+        {
+            <MudText>@choice.Name</MudText>
+        }
+    </ItemTemplate>
+</MudAutocomplete>
+
+@code {
+    [Parameter]
+    public IngredientChoice? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<IngredientChoice?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    private async Task<IEnumerable<IngredientChoice>> SearchAsync(string? text, CancellationToken cancellationToken)
+    {
+        text ??= "";
+
+        // Opening the list on an already-picked line searches for its name; show what's picked rather than repeating it as "new".
+        if (Value is not null && text == Value.Name)
+        {
+            return [Value];
+        }
+
+        var matches = await App.Ingredients.SearchAsync(text);
+        var choices = matches.Select(IngredientChoice.Existing).ToList();
+        if (!string.IsNullOrWhiteSpace(text) && await App.Ingredients.FindByNameAsync(text) is null)
+        {
+            choices.Add(IngredientChoice.New(text));
+        }
+
+        return choices;
+    }
+}

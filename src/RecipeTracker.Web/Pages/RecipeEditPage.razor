@@ -1,0 +1,159 @@
+@page "/recipes/new"
+@page "/recipes/{RecipeId}/edit"
+@using RecipeTracker.Core.Quantities
+@using RecipeTracker.Core.Recipes
+@inject AppCore App
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(RecipeId is null ? "New Recipe" : "Edit Recipe")</PageTitle>
+
+@if (!_loaded)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_editor is null)
+{
+    <MudText Typo="Typo.h5" HtmlTag="h1">Recipe not found</MudText>
+    <MudText Class="mud-text-secondary">It may have been deleted.</MudText>
+}
+else
+{
+    <div class="d-flex align-center mb-2">
+        <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">@(RecipeId is null ? "New Recipe" : "Edit Recipe")</MudText>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">Save</MudButton>
+    </div>
+
+    <MudTextField @bind-Value="_editor.Title" Label="Title" Immediate="true" AutoFocus="@(RecipeId is null)" Class="mb-2" />
+    <MudTextField @bind-Value="_editor.Description" Label="Description" Lines="2" Sizing="InputSizing.Auto" Class="mb-2" />
+
+    <div class="d-flex flex-wrap gap-3 mb-2">
+        <MudNumericField T="decimal?" @bind-Value="_editor.YieldAmount" Label="Makes" Min="0" HideSpinButtons="true" Class="field-narrow" />
+        <MudTextField @bind-Value="_editor.YieldLabel" Label="servings, cookies…" Class="field-medium" />
+    </div>
+    <div class="d-flex flex-wrap gap-3 mb-4">
+        <MudNumericField T="int?" @bind-Value="_editor.PrepMinutes" Label="Prep (min)" Min="0" HideSpinButtons="true" Class="field-narrow" />
+        <MudNumericField T="int?" @bind-Value="_editor.CookMinutes" Label="Cook (min)" Min="0" HideSpinButtons="true" Class="field-narrow" />
+        <MudNumericField T="int?" @bind-Value="_editor.TotalMinutes" Label="Total (min)" Min="0" HideSpinButtons="true" Class="field-narrow" />
+    </div>
+
+    <MudText Typo="Typo.h6" HtmlTag="h2">Ingredients</MudText>
+    @foreach (var group in _editor.Sections)
+    {
+        <MudPaper Outlined="@(group.IsHeaded)" Elevation="0" Class="@(group.IsHeaded ? "pa-2 mb-2" : "mb-2")" @key="group.Id">
+            @if (group.IsHeaded)
+            {
+                <div class="d-flex align-center">
+                    <MudTextField @bind-Value="group.Heading" Label="Section heading" Placeholder="For the dough" Class="flex-grow-1" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move section up"
+                                   OnClick="() => _editor.MoveSection(group, -1)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Move section down"
+                                   OnClick="() => _editor.MoveSection(group, +1)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" aria-label="Remove heading"
+                                   title="Remove the heading; its lines stay" OnClick="() => _editor.RemoveSection(group)" />
+                </div>
+            }
+            @foreach (var line in group.Lines)
+            {
+                <div class="ingredient-line-edit" @key="line.Id">
+                    <div class="d-flex gap-2 align-end">
+                        <MudTextField @bind-Value="line.QuantityText" Label="Qty" Immediate="true" Class="field-qty"
+                                      Validation="@(new Func<string, string?>(QuantityError))" />
+                        <MudTextField @bind-Value="line.Unit" Label="Unit" Class="field-unit" />
+                        <IngredientPicker @bind-Value="line.Ingredient" Class="flex-grow-1" />
+                    </div>
+                    <div class="d-flex gap-2 align-center">
+                        <MudTextField @bind-Value="line.Preparation" Label="Preparation" Placeholder="diced" Class="flex-grow-1" />
+                        <MudCheckBox @bind-Value="line.Optional" Label="Optional" Dense="true" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move line up"
+                                       OnClick="() => _editor.MoveLine(line, -1)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Move line down"
+                                       OnClick="() => _editor.MoveLine(line, +1)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Remove line"
+                                       OnClick="() => _editor.RemoveLine(line)" />
+                    </div>
+                </div>
+            }
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="() => _editor.AddLine(group)">
+                Add line@(group.IsHeaded ? $" to {group.Heading}" : "")
+            </MudButton>
+        </MudPaper>
+    }
+    <MudButton StartIcon="@Icons.Material.Filled.PlaylistAdd" Size="Size.Small" Class="mb-4" OnClick="() => _editor.AddSection()">
+        Add section
+    </MudButton>
+
+    <MudText Typo="Typo.h6" HtmlTag="h2">Steps</MudText>
+    @for (var index = 0; index < _editor.Steps.Count; index++)
+    {
+        var step = _editor.Steps[index];
+        var number = index + 1;
+        <div class="d-flex align-start gap-2 mb-1" @key="step.Id">
+            <MudText Typo="Typo.h6" Class="step-number">@number</MudText>
+            <MudTextField @bind-Value="step.Text" Label="@($"Step {number}")" Lines="2" Sizing="InputSizing.Auto" Class="flex-grow-1" />
+            <div class="d-flex flex-column">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move step up"
+                               OnClick="() => _editor.MoveStep(step, -1)" />
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Move step down"
+                               OnClick="() => _editor.MoveStep(step, +1)" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Remove step"
+                               OnClick="() => _editor.RemoveStep(step)" />
+            </div>
+        </div>
+    }
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Class="mb-4" OnClick="() => _editor.AddStep()">Add step</MudButton>
+
+    <div class="d-flex justify-end gap-2 mb-6">
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">Save</MudButton>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? RecipeId { get; set; }
+
+    private RecipeEditor? _editor;
+    private bool _loaded;
+    private bool _saving;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (RecipeId is null)
+        {
+            _editor = App.Recipes.NewRecipe();
+            _editor.AddLine(_editor.Sections[0]);
+            _editor.AddStep();
+        }
+        else
+        {
+            _editor = await App.Recipes.EditRecipeAsync(RecipeId);
+        }
+
+        _loaded = true;
+    }
+
+    private static string? QuantityError(string text) =>
+        Quantity.TryParse(text, out _) ? null : "Try 2, 1½, 1 1/2 or 2-3";
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            var recipe = await App.Recipes.SaveAsync(_editor!);
+            Navigation.NavigateTo($"recipes/{recipe.Id}", replace: true);
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => Navigation.NavigateTo(RecipeId is null ? "" : $"recipes/{RecipeId}", replace: true);
+}

@@ -153,3 +153,53 @@ h1:focus {
     .recipe-row:hover {
         background-color: var(--mud-palette-action-default-hover);
     }
+
+/* Recipe page */
+.ingredient-lines {
+    margin: 0 0 0.5rem 0;
+    padding-left: 1.25rem;
+}
+
+.ingredient-lines li {
+    padding: 0.2rem 0;
+}
+
+.recipe-steps {
+    padding-left: 1.5rem;
+}
+
+.recipe-steps li {
+    padding: 0.4rem 0;
+    white-space: pre-line;
+}
+
+.recipe-description {
+    white-space: pre-line;
+}
+
+/* Recipe editor */
+.field-narrow {
+    max-width: 8rem;
+}
+
+.field-medium {
+    max-width: 16rem;
+}
+
+.field-qty {
+    flex: 0 0 4.5rem;
+}
+
+.field-unit {
+    flex: 0 0 5rem;
+}
+
+.ingredient-line-edit {
+    padding: 0.25rem 0 0.5rem 0;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.step-number {
+    min-width: 1.5rem;
+    padding-top: 1.25rem;
+}
