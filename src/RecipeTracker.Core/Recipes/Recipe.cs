@@ -116,4 +116,25 @@ public sealed record IngredientLine
 }
 
 /// <summary>One numbered instruction in a Recipe.</summary>
-public sealed record Step(string Id, string Text);
+public sealed record Step(string Id, string Text)
+{
+    /// <summary>The Ingredient Lines this Step uses, in the order shown.</summary>
+    public IReadOnlyList<IngredientUse> Uses { get; init; } = [];
+}
+
+/// <summary>
+/// A Step's use of an Ingredient Line, with its own amount when the Step uses only part of the
+/// line (half the sugar). With no amount, the Step uses the whole line.
+/// </summary>
+/// <param name="Quantity">The part used, or null with a blank unit for the whole line.</param>
+public sealed record IngredientUse(string LineId, Quantity? Quantity = null, string Unit = "")
+{
+    /// <summary>
+    /// Only on a Draft: a suggested use the Cook unticked, kept so it isn't suggested again.
+    /// Finishing the Draft drops it.
+    /// </summary>
+    public bool Unticked { get; init; }
+
+    /// <summary>True when the use has its own amount, rather than the whole line.</summary>
+    public bool HasAmount => Quantity is not null || Unit.Length > 0;
+}

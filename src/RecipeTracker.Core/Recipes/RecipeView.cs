@@ -32,6 +32,36 @@ public sealed class RecipeView
 
     public Recipe Recipe { get; }
 
+    /// <summary>
+    /// The Ingredient Uses shown under a Step, such as "butter, 2 tbsp" or "sugar, ½ cup (of 1 cup)".
+    /// Unticked suggestions on a Draft, and uses of lines that are gone, aren't shown.
+    /// </summary>
+    public IReadOnlyList<ShownUse> UsesFor(Step step)
+    {
+        var lines = Ingredients.SelectMany(group => group.Lines).ToDictionary(shown => shown.Line.Id);
+        return step.Uses
+            .Where(use => !use.Unticked && lines.ContainsKey(use.LineId))
+            .Select(use =>
+            {
+                var shown = lines[use.LineId];
+                var lineAmount = Amount(shown.Line.Quantity, shown.Line.Unit);
+                var text = !use.HasAmount
+                    ? (lineAmount.Length == 0 ? shown.IngredientName : $"{shown.IngredientName}, {MidSentence(lineAmount)}")
+                    : $"{shown.IngredientName}, {MidSentence(Amount(use.Quantity, use.Unit))}{(lineAmount.Length == 0 ? "" : $" (of {MidSentence(lineAmount)})")}";
+                return new ShownUse(use, shown, text);
+            })
+            .ToList();
+    }
+
+    // "Pinch" was capitalised at the start of "Pinch of salt"; after "salt, " it reads as "pinch".
+    private static string MidSentence(string amount) =>
+        amount.Length > 0 && char.IsUpper(amount[0]) && (amount.Length == 1 || !char.IsUpper(amount[1]))
+            ? char.ToLowerInvariant(amount[0]) + amount[1..]
+            : amount;
+
+    private static string Amount(Quantities.Quantity? quantity, string unit) =>
+        string.Join(" ", new[] { quantity?.ToString(), unit }.Where(part => !string.IsNullOrEmpty(part)));
+
     /// <summary>The Recipe's Tags, by Tag Group in the Cook's order, ungrouped last; groups it has no Tags in are left out.</summary>
     public IReadOnlyList<GroupedTags<Tag>> Tags { get; }
 
@@ -70,7 +100,7 @@ public sealed class RecipeView
             name = line.OriginalText;
         }
 
-        var amount = string.Join(" ", new[] { line.Quantity?.ToString(), line.Unit }.Where(part => !string.IsNullOrEmpty(part)));
+        var amount = Amount(line.Quantity, line.Unit);
 
         // "pinch of salt" rather than "pinch salt" when there's a unit but no number.
         var text = amount.Length == 0 ? name : line.Quantity is null ? $"{amount} of {name}" : $"{amount} {name}";
@@ -90,6 +120,9 @@ public sealed class RecipeView
 
 /// <summary>An Ingredient Section's heading (null for the lines before the first one) and its lines.</summary>
 public sealed record IngredientGroup(string? Heading, IReadOnlyList<ShownLine> Lines);
+
+/// <summary>A Step's Ingredient Use with its line and the use written out, such as "sugar, ½ cup (of 1 cup)".</summary>
+public sealed record ShownUse(IngredientUse Use, ShownLine Line, string Text);
 
 /// <summary>An Ingredient Line with its Ingredient's name and the line written out, such as "1½ cups flour, sifted".</summary>
 public sealed record ShownLine(IngredientLine Line, string IngredientName, string Text);

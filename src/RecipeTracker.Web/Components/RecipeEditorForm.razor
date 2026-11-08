@@ -92,13 +92,52 @@
 </MudButton>
 
 <MudText Typo="Typo.h6" HtmlTag="h2">Steps</MudText>
+@{
+    // Suggested Ingredient Uses follow the Step text and the lines as they change. Refreshing on
+    // every render is idempotent and cheap for a Recipe's few lines.
+    Editor.RefreshUses();
+}
 @for (var index = 0; index < Editor.Steps.Count; index++)
 {
     var step = Editor.Steps[index];
     var number = index + 1;
     <div class="d-flex align-start gap-2 mb-1" @key="step.Id">
         <MudText Typo="Typo.h6" Class="step-number">@number</MudText>
-        <MudTextField @bind-Value="step.Text" Label="@($"Step {number}")" Lines="2" Sizing="InputSizing.Auto" Class="flex-grow-1" />
+        <div class="flex-grow-1">
+            <MudTextField @bind-Value="step.Text" Label="@($"Step {number}")" Lines="2" Sizing="InputSizing.Auto" />
+            <div class="step-uses-edit">
+                @foreach (var use in step.Uses)
+                {
+                    var line = Editor.LineFor(use.LineId);
+                    if (line is null)
+                    {
+                        continue;
+                    }
+
+                    <div class="d-flex align-center gap-2 use-row" @key="use.LineId">
+                        <MudCheckBox @bind-Value="use.Ticked" Dense="true" Size="Size.Small" Label="@line.Label" Class="flex-grow-1 use-tick" />
+                        @if (use.Ticked)
+                        {
+                            <MudTextField @bind-Value="use.QuantityText" Placeholder="all" Margin="Margin.Dense" Class="field-qty"
+                                          aria-label="@($"Amount of {line.Label} used")" Validation="@(new Func<string, string?>(QuantityError))" />
+                            <MudTextField @bind-Value="use.Unit" Placeholder="unit" Margin="Margin.Dense" Class="field-unit"
+                                          aria-label="@($"Unit of {line.Label} used")" />
+                        }
+                    </div>
+                }
+                @{ var unused = Editor.LinesNotUsedBy(step); }
+                @if (unused.Count > 0)
+                {
+                    <MudMenu Label="Add an ingredient" StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Text"
+                             Dense="true" Class="add-use">
+                        @foreach (var line in unused)
+                        {
+                            <MudMenuItem OnClick="() => Editor.AddUse(step, line)">@line.Label</MudMenuItem>
+                        }
+                    </MudMenu>
+                }
+            </div>
+        </div>
         <div class="d-flex flex-column">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Move step up"
                            OnClick="() => Editor.MoveStep(step, -1)" />

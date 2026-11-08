@@ -253,6 +253,24 @@ h1:focus {
     font-style: italic;
 }
 
+/* A Step's Ingredient Uses: under the Step on the recipe page, and as ticks in the editor. */
+.step-uses {
+    font-size: 0.875rem;
+    white-space: normal;
+}
+
+.step-uses-edit {
+    padding: 0.25rem 0 0.5rem 0;
+}
+
+.use-row {
+    min-height: 2.25rem;
+}
+
+.use-row .mud-input-control {
+    margin-top: 0;
+}
+
 /* A Recipe's Tags: each Tag Group's name leads its chips. */
 .tag-group-name {
     font-size: 0.75rem;

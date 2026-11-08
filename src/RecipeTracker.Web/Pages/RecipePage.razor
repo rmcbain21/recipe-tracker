@@ -124,7 +124,8 @@ else
         <ol class="recipe-steps">
             @foreach (var step in recipe.Steps)
             {
-                <li @key="step.Id">@Noted(step.Id, step.Text)</li>
+                var uses = _view.UsesFor(step);
+                <li @key="step.Id">@Noted(step.Id, step.Text, uses.Count == 0 ? null : string.Join(" · ", uses.Select(u => u.Text)))</li>
             }
         </ol>
     }
@@ -158,12 +159,19 @@ else
 
     // A line's or Step's text with its Notes: a note button (with the count) that expands them in
     // place, and a ⋯ menu to add one. A long-press (the context menu) adds one too.
-    private RenderFragment Noted(string targetId, string text) => __builder =>
+    // A Step's Ingredient Uses show under its text, as subtext.
+    private RenderFragment Noted(string targetId, string text, string? subtext = null) => __builder =>
     {
         var notes = _view!.NotesFor(targetId);
         var open = _openNotes.Contains(targetId);
         <div class="noted d-flex align-start gap-1" @oncontextmenu="() => AddNoteAsync(targetId, text)" @oncontextmenu:preventDefault="true">
-            <span class="flex-grow-1 noted-text">@text</span>
+            <div class="flex-grow-1">
+                <span class="noted-text">@text</span>
+                @if (subtext is not null)
+                {
+                    <div class="step-uses mud-text-secondary">@subtext</div>
+                }
+            </div>
             @if (notes.Count > 0)
             {
                 <MudButton Size="Size.Small" Variant="Variant.Text" Class="note-toggle"

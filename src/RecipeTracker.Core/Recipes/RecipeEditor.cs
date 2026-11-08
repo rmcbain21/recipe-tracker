@@ -1,4 +1,5 @@
 using RecipeTracker.Core.Ingredients;
+using RecipeTracker.Core.Parsing;
 
 namespace RecipeTracker.Core.Recipes;
 
@@ -63,8 +64,71 @@ public sealed class RecipeEditor
             section.LinesList.Add(edited);
         }
 
-        _steps.AddRange(original.Steps.Select(step => new EditedStep(step.Id) { Text = step.Text }));
+        foreach (var step in original.Steps)
+        {
+            var edited = new EditedStep(step.Id) { Text = step.Text, LoadedText = step.Text };
+            edited.UsesList.AddRange(step.Uses.Select(use => new EditedUse(use.LineId)
+            {
+                Ticked = !use.Unticked,
+                QuantityText = use.Quantity?.ToString() ?? "",
+                Unit = use.Unit,
+            }));
+            _steps.Add(edited);
+        }
     }
+
+    /// <summary>
+    /// Brings every Step's suggested Ingredient Uses up to date with its text and the lines: adds
+    /// newly named lines, and drops unticked suggestions no longer named and uses of removed lines.
+    /// A new suggestion is ticked, except on an unchanged Step of a finished Recipe, so that a use
+    /// the Cook took off isn't put back when they edit something else. Safe to call often.
+    /// </summary>
+    public void RefreshUses()
+    {
+        var lines = AllLines.ToList();
+        var lineIds = lines.Select(line => line.Id).ToHashSet();
+        var candidates = lines.Select(line => new UseCandidate(line.Id, line.Names)).ToList();
+
+        foreach (var step in _steps)
+        {
+            var suggested = IngredientUseSuggester.Suggest(step.Text, candidates).ToHashSet();
+            step.UsesList.RemoveAll(use => !lineIds.Contains(use.LineId) || (!use.Ticked && !suggested.Contains(use.LineId)));
+
+            var tickNew = Original is not { IsDraft: false } || step.Text != step.LoadedText;
+            foreach (var lineId in suggested.Where(id => step.UsesList.All(use => use.LineId != id)))
+            {
+                step.UsesList.Add(new EditedUse(lineId) { Ticked = tickNew });
+            }
+
+            // Keep uses in the order of the ingredient list.
+            step.UsesList.Sort((a, b) => lines.FindIndex(l => l.Id == a.LineId).CompareTo(lines.FindIndex(l => l.Id == b.LineId)));
+        }
+    }
+
+    /// <summary>Adds a ticked use of a line the Step's text doesn't name ("add an ingredient").</summary>
+    public void AddUse(EditedStep step, EditedLine line)
+    {
+        var use = step.UsesList.FirstOrDefault(u => u.LineId == line.Id);
+        if (use is null)
+        {
+            step.UsesList.Add(new EditedUse(line.Id) { Ticked = true });
+        }
+        else
+        {
+            use.Ticked = true;
+        }
+
+        RefreshUses();
+    }
+
+    /// <summary>The lines a Step doesn't use yet, for "add an ingredient".</summary>
+    public IReadOnlyList<EditedLine> LinesNotUsedBy(EditedStep step) =>
+        AllLines.Where(line => !line.IsBlank && step.Uses.All(use => use.LineId != line.Id || !use.Ticked)).ToList();
+
+    /// <summary>The line with this id, or null if it's been removed.</summary>
+    public EditedLine? LineFor(string lineId) => AllLines.FirstOrDefault(line => line.Id == lineId);
+
+    private IEnumerable<EditedLine> AllLines => _sections.SelectMany(section => section.LinesList);
 
     /// <summary>The Recipe as it was saved, or null for a new one.</summary>
     internal Recipe? Original { get; }
@@ -216,8 +280,9 @@ public sealed class RecipeEditor
     {
         if (line.IngredientId is not null)
         {
-            var name = ingredients.TryGetValue(line.IngredientId, out var ingredient) ? ingredient.Name : "Unknown Ingredient";
-            return IngredientChoice.Existing(line.IngredientId, name);
+            return ingredients.TryGetValue(line.IngredientId, out var ingredient)
+                ? IngredientChoice.Existing(ingredient)
+                : IngredientChoice.Existing(line.IngredientId, "Unknown Ingredient");
         }
 
         return line.SuggestedName.Length > 0 ? IngredientChoice.New(line.SuggestedName) : null;
@@ -306,6 +371,23 @@ public sealed class EditedLine
     /// <summary>On a captured line, the Ingredient name the parser read, kept so that a Draft can show how it matched.</summary>
     public string SuggestedName { get; internal set; } = "";
 
+    /// <summary>The line as the Cook would say it, such as "1 cup sugar", for listing it under a Step.</summary>
+    public string Label
+    {
+        get
+        {
+            var name = Ingredient?.Name ?? (SuggestedName.Length > 0 ? SuggestedName : OriginalText);
+            return string.Join(" ", new[] { QuantityText.Trim(), Unit.Trim(), name }.Where(part => part.Length > 0));
+        }
+    }
+
+    // The names a Step's text could call the line by: the Ingredient's name and aliases, and the name the parser read.
+    internal IReadOnlyList<string> Names =>
+        new[] { Ingredient?.Name, SuggestedName }.Concat(Ingredient?.Aliases ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!)
+            .ToList();
+
     internal bool IsBlank =>
         string.IsNullOrWhiteSpace(QuantityText) && string.IsNullOrWhiteSpace(Unit) &&
         Ingredient is null && string.IsNullOrWhiteSpace(Preparation);
@@ -322,6 +404,33 @@ public sealed class EditedStep
     public string Id { get; }
 
     public string Text { get; set; } = "";
+
+    /// <summary>The Ingredient Uses listed under the Step, ticked or not, in ingredient-list order.</summary>
+    public IReadOnlyList<EditedUse> Uses => UsesList;
+
+    internal List<EditedUse> UsesList { get; } = [];
+
+    /// <summary>The text as saved, or null for a Step added in this edit.</summary>
+    internal string? LoadedText { get; init; }
+}
+
+/// <summary>A Step's use of an Ingredient Line in a <see cref="RecipeEditor"/>, with its amount still as typed.</summary>
+public sealed class EditedUse
+{
+    internal EditedUse(string lineId)
+    {
+        LineId = lineId;
+    }
+
+    public string LineId { get; }
+
+    /// <summary>True if the Step uses the line. Unticked suggestions are listed so the Cook can tick them.</summary>
+    public bool Ticked { get; set; }
+
+    /// <summary>The part of the line used, such as "½"; blank for the whole line.</summary>
+    public string QuantityText { get; set; } = "";
+
+    public string Unit { get; set; } = "";
 }
 
 /// <summary>
@@ -343,7 +452,15 @@ public sealed record IngredientChoice
 
     public bool IsNew => IngredientId is null;
 
-    public static IngredientChoice Existing(Ingredient ingredient) => new(ingredient.Id, ingredient.Name);
+    /// <summary>The existing Ingredient's aliases, used to suggest Ingredient Uses. Not part of equality.</summary>
+    public IReadOnlyList<string> Aliases { get; private init; } = [];
+
+    public bool Equals(IngredientChoice? other) =>
+        other is not null && IngredientId == other.IngredientId && Name == other.Name;
+
+    public override int GetHashCode() => HashCode.Combine(IngredientId, Name);
+
+    public static IngredientChoice Existing(Ingredient ingredient) => new(ingredient.Id, ingredient.Name) { Aliases = ingredient.Aliases };
 
     public static IngredientChoice Existing(string ingredientId, string name) => new(ingredientId, name);
 

@@ -138,6 +138,7 @@ public sealed partial class RecipeCatalogue
             editor.AddStep(step);
         }
 
+        editor.RefreshUses();
         return editor;
     }
 
@@ -235,6 +236,7 @@ public sealed partial class RecipeCatalogue
 
     private async Task<Recipe> SaveAsync(RecipeEditor editor, bool asDraft)
     {
+        editor.RefreshUses();
         var title = editor.Title.Trim();
         if (title.Length == 0)
         {
@@ -289,9 +291,18 @@ public sealed partial class RecipeCatalogue
             }
         }
 
+        // Uses of lines that weren't saved (removed or blank) go with them. A Draft keeps unticked
+        // suggestions so they aren't suggested again; a finished Recipe keeps only the ticked uses.
+        var savedLineIds = lines.Select(line => line.Id).ToHashSet();
         var steps = editor.Steps
             .Where(step => !string.IsNullOrWhiteSpace(step.Text))
-            .Select(step => new Step(step.Id, step.Text.Trim()))
+            .Select(step => new Step(step.Id, step.Text.Trim())
+            {
+                Uses = step.Uses
+                    .Where(use => savedLineIds.Contains(use.LineId) && (use.Ticked || asDraft))
+                    .Select(use => use.Ticked ? UseFor(use) : new IngredientUse(use.LineId) { Unticked = true })
+                    .ToList(),
+            })
             .ToList();
         if (!asDraft && lines.Count == 0 && steps.Count == 0)
         {
@@ -328,6 +339,16 @@ public sealed partial class RecipeCatalogue
             .ToList();
         await _store.SaveAllAsync(records);
         return recipe;
+    }
+
+    private static IngredientUse UseFor(EditedUse use)
+    {
+        if (!Quantity.TryParse(use.QuantityText, out var quantity))
+        {
+            throw new RuleViolationException($"\"{use.QuantityText.Trim()}\" isn't an amount. Try \"½\", \"1 1/2\" or \"2-3\", or leave it blank for the whole line.");
+        }
+
+        return new IngredientUse(use.LineId, quantity, use.Unit.Trim());
     }
 
     private static IngredientLine FinishedLine(IngredientLine stored, EditedLine line, List<Ingredient> known, List<Ingredient> created, DateTimeOffset now)

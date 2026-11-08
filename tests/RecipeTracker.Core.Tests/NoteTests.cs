@@ -56,7 +56,7 @@ public class NoteTests
         Assert.Equal(_clock.UtcNow, stored.UpdatedAt); // so that the Note syncs
         Assert.Equal(recipe.Title, stored.Title);
         Assert.Equal(recipe.Lines, stored.Lines);
-        Assert.Equal(recipe.Steps, stored.Steps);
+        Assert.Equal(recipe.Steps.Select(s => (s.Id, s.Text)), stored.Steps.Select(s => (s.Id, s.Text)));
         Assert.Equal(recipe.CreatedAt, stored.CreatedAt);
         Assert.False(stored.IsDraft);
     }
