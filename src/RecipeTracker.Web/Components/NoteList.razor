@@ -1,0 +1,33 @@
+@* Notes as the recipe page shows them, newest first, each with its date and an edit / delete menu. *@
+@using RecipeTracker.Core.Recipes
+
+<div class="note-list @Class">
+    @foreach (var note in Notes)
+    {
+        <div class="note d-flex align-start gap-1" @key="note.Id">
+            <MudIcon Icon="@Icons.Material.Outlined.StickyNote2" Size="Size.Small" Class="mt-1 note-icon" />
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.body2" Class="note-text">@note.Text</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@note.CreatedAt.ToLocalTime().ToString("d MMM yyyy")</MudText>
+            </div>
+            <MudMenu Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Small" Dense="true" AriaLabel="Note options">
+                <MudMenuItem OnClick="() => OnEdit.InvokeAsync(note)">Edit</MudMenuItem>
+                <MudMenuItem OnClick="() => OnDelete.InvokeAsync(note)">Delete</MudMenuItem>
+            </MudMenu>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Note> Notes { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<Note> OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback<Note> OnDelete { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+}

@@ -161,6 +161,59 @@ public sealed partial class RecipeCatalogue
         }
     }
 
+    /// <summary>Adds a Note to the Recipe, or to one of its Ingredient Lines or Steps.</summary>
+    /// <param name="targetId">The line's or Step's id, or null for the whole Recipe.</param>
+    /// <exception cref="RuleViolationException">The Note is blank, or the Recipe, line or Step is gone.</exception>
+    public async Task<Note> AddNoteAsync(string recipeId, string? targetId, string text)
+    {
+        var recipe = await LoadForNoteAsync(recipeId);
+        if (targetId is not null && !NoteTargets(recipe).Contains(targetId))
+        {
+            throw new RuleViolationException("That line or Step has been removed from the Recipe.");
+        }
+
+        var note = new Note(Guid.NewGuid().ToString(), targetId, NoteText(text), _clock.UtcNow);
+        await _store.SaveAsync(Table, recipe with { UpdatedAt = _clock.UtcNow, Notes = [.. recipe.Notes, note] });
+        return note;
+    }
+
+    /// <summary>Changes a Note's text. It keeps its place and the date it was added.</summary>
+    /// <exception cref="RuleViolationException">The Note is blank, or it or its Recipe is gone.</exception>
+    public async Task<Note> EditNoteAsync(string recipeId, string noteId, string text)
+    {
+        var recipe = await LoadForNoteAsync(recipeId);
+        var note = recipe.Notes.FirstOrDefault(n => n.Id == noteId) ?? throw new RuleViolationException("That Note has been deleted.");
+        var edited = note with { Text = NoteText(text) };
+        await _store.SaveAsync(Table, recipe with
+        {
+            UpdatedAt = _clock.UtcNow,
+            Notes = recipe.Notes.Select(n => n.Id == noteId ? edited : n).ToList(),
+        });
+        return edited;
+    }
+
+    public async Task DeleteNoteAsync(string recipeId, string noteId)
+    {
+        var recipe = await LoadAsync(recipeId);
+        if (recipe is not null && recipe.Notes.Any(n => n.Id == noteId))
+        {
+            await _store.SaveAsync(Table, recipe with
+            {
+                UpdatedAt = _clock.UtcNow,
+                Notes = recipe.Notes.Where(n => n.Id != noteId).ToList(),
+            });
+        }
+    }
+
+    private async Task<Recipe> LoadForNoteAsync(string recipeId) =>
+        await LoadAsync(recipeId) ?? throw new RuleViolationException("That Recipe has been deleted.");
+
+    private static string NoteText(string text) =>
+        string.IsNullOrWhiteSpace(text) ? throw new RuleViolationException("Write something in the Note.") : text.Trim();
+
+    private static HashSet<string> NoteTargets(Recipe recipe) =>
+        recipe.Lines.Select(line => line.Id).Concat(recipe.Steps.Select(step => step.Id)).ToHashSet();
+
     private async Task<Recipe> SaveAsync(RecipeEditor editor, bool asDraft)
     {
         var title = editor.Title.Trim();
@@ -242,6 +295,12 @@ public sealed partial class RecipeCatalogue
             Lines = lines,
             Steps = steps,
         };
+
+        // Notes aren't part of the editor. Take them from the Recipe as stored now (a Note may have
+        // been added since the editor opened), dropping those on lines and Steps that are gone.
+        var notes = editor.Original is null ? [] : (await _store.LoadAsync<Recipe>(Table, editor.Original.Id))?.Notes ?? editor.Original.Notes;
+        var targets = NoteTargets(recipe);
+        recipe = recipe with { Notes = notes.Where(note => note.TargetId is null || targets.Contains(note.TargetId)).ToList() };
 
         var records = created.Select(ingredient => new RecordToSave(IngredientCatalogue.Table, ingredient))
             .Append(new RecordToSave(Table, recipe))

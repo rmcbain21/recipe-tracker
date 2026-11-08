@@ -41,7 +41,17 @@ public sealed record Recipe : StoredRecord
 
     /// <summary>The numbered Steps, in order. A Recipe's Steps are one list, not split by section.</summary>
     public IReadOnlyList<Step> Steps { get; init; } = [];
+
+    /// <summary>The Cook's Notes on the Recipe, its lines and its Steps, in the order they were added.</summary>
+    public IReadOnlyList<Note> Notes { get; init; } = [];
 }
+
+/// <summary>
+/// The Cook's comment on a Recipe, an Ingredient Line or a Step, such as "used half the sugar,
+/// still sweet enough". A Note never changes the Recipe.
+/// </summary>
+/// <param name="TargetId">The Ingredient Line's or Step's id, or null for a Note on the whole Recipe.</param>
+public sealed record Note(string Id, string? TargetId, string Text, DateTimeOffset CreatedAt);
 
 /// <summary>How much a Recipe makes: a number and what it counts ("4 servings"), or just a label ("one 9×13 pan").</summary>
 public sealed record Yield(decimal? Amount, string Label)

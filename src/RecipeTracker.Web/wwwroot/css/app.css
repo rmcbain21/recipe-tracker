@@ -173,6 +173,45 @@ h1:focus {
     white-space: pre-line;
 }
 
+/* Notes: a soft panel, so they read as the Cook's comments rather than part of the Recipe. */
+.note-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    white-space: normal;
+}
+
+.note {
+    background: var(--mud-palette-warning-lighten);
+    background: color-mix(in srgb, var(--mud-palette-warning) 12%, transparent);
+    border-radius: 6px;
+    padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+}
+
+.note-text {
+    white-space: pre-line;
+}
+
+.note-icon {
+    color: var(--mud-palette-warning-darken);
+}
+
+/* The note count and ⋯ beside a line or Step stay small and quiet. */
+.noted .mud-icon-button,
+.note-toggle {
+    margin-top: -0.35rem;
+    margin-bottom: -0.35rem;
+}
+
+.noted-menu .mud-icon-button {
+    color: var(--mud-palette-text-secondary);
+}
+
+.note-toggle {
+    min-width: 0;
+    color: var(--mud-palette-warning-darken);
+}
+
 .recipe-description {
     white-space: pre-line;
 }

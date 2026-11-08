@@ -3,6 +3,7 @@
 @inject AppCore App
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 
 <PageTitle>@(_view?.Recipe.Title ?? "Recipe")</PageTitle>
 
@@ -25,6 +26,7 @@ else
         <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">@recipe.Title</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Edit Recipe" Href="@($"recipes/{recipe.Id}/edit")" />
         <MudMenu Icon="@Icons.Material.Filled.MoreVert" Dense="true" AriaLabel="Recipe options">
+            <MudMenuItem OnClick="() => AddNoteAsync(null, recipe.Title)">Add a Note</MudMenuItem>
             <MudMenuItem OnClick="DeleteAsync">Delete</MudMenuItem>
         </MudMenu>
     </div>
@@ -58,6 +60,11 @@ else
     @if (recipe.Description.Length > 0)
     {
         <MudText Typo="Typo.body1" Class="mb-2 recipe-description">@recipe.Description</MudText>
+    }
+
+    @if (_view.RecipeNotes.Count > 0)
+    {
+        <NoteList Notes="_view.RecipeNotes" OnEdit="EditNoteAsync" OnDelete="DeleteNoteAsync" Class="mb-3 recipe-notes" />
     }
 
     @if (recipe.Yield is not null || !recipe.StatedTimes.IsEmpty)
@@ -96,7 +103,7 @@ else
         <ul class="ingredient-lines">
             @foreach (var line in group.Lines)
             {
-                <li>@line.Text</li>
+                <li @key="line.Line.Id">@Noted(line.Line.Id, line.Text)</li>
             }
         </ul>
     }
@@ -111,7 +118,7 @@ else
         <ol class="recipe-steps">
             @foreach (var step in recipe.Steps)
             {
-                <li>@step.Text</li>
+                <li @key="step.Id">@Noted(step.Id, step.Text)</li>
             }
         </ol>
     }
@@ -141,6 +148,92 @@ else
 
         await App.Recipes.DeleteRecipeAsync(RecipeId);
         Navigation.NavigateTo("", replace: true);
+    }
+
+    // A line's or Step's text with its Notes: a note button (with the count) that expands them in
+    // place, and a ⋯ menu to add one. A long-press (the context menu) adds one too.
+    private RenderFragment Noted(string targetId, string text) => __builder =>
+    {
+        var notes = _view!.NotesFor(targetId);
+        var open = _openNotes.Contains(targetId);
+        <div class="noted d-flex align-start gap-1" @oncontextmenu="() => AddNoteAsync(targetId, text)" @oncontextmenu:preventDefault="true">
+            <span class="flex-grow-1 noted-text">@text</span>
+            @if (notes.Count > 0)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" Class="note-toggle"
+                           StartIcon="@(open ? Icons.Material.Filled.StickyNote2 : Icons.Material.Outlined.StickyNote2)"
+                           aria-expanded="@(open ? "true" : "false")" aria-label="@($"{notes.Count} {(notes.Count == 1 ? "Note" : "Notes")}")"
+                           OnClick="() => ToggleNotes(targetId)">@notes.Count</MudButton>
+            }
+            <MudMenu Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Small" Dense="true" AriaLabel="Line options" Class="noted-menu">
+                <MudMenuItem OnClick="() => AddNoteAsync(targetId, text)">Add a Note</MudMenuItem>
+            </MudMenu>
+        </div>
+        @if (open && notes.Count > 0)
+        {
+            <NoteList Notes="notes" OnEdit="EditNoteAsync" OnDelete="DeleteNoteAsync" Class="mb-2" />
+        }
+    };
+
+    private readonly HashSet<string> _openNotes = [];
+
+    private void ToggleNotes(string targetId)
+    {
+        if (!_openNotes.Remove(targetId))
+        {
+            _openNotes.Add(targetId);
+        }
+    }
+
+    private async Task AddNoteAsync(string? targetId, string about)
+    {
+        var parameters = new DialogParameters<NoteDialog> { { d => d.About, about } };
+        var dialog = await DialogService.ShowAsync<NoteDialog>("Add a Note", parameters);
+        if (await dialog.Result is not { Canceled: false, Data: string text })
+        {
+            return;
+        }
+
+        await RunAsync(() => App.Recipes.AddNoteAsync(RecipeId, targetId, text));
+        if (targetId is not null)
+        {
+            _openNotes.Add(targetId);
+        }
+    }
+
+    private async Task EditNoteAsync(Note note)
+    {
+        var parameters = new DialogParameters<NoteDialog> { { d => d.CurrentText, note.Text } };
+        var dialog = await DialogService.ShowAsync<NoteDialog>("Edit Note", parameters);
+        if (await dialog.Result is { Canceled: false, Data: string text })
+        {
+            await RunAsync(() => App.Recipes.EditNoteAsync(RecipeId, note.Id, text));
+        }
+    }
+
+    private async Task DeleteNoteAsync(Note note)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete Note?", $"\"{note.Text}\" will be deleted.", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed == true)
+        {
+            await RunAsync(() => App.Recipes.DeleteNoteAsync(RecipeId, note.Id));
+        }
+    }
+
+    // Runs a Note change, shows a rule it breaks, and reloads the Recipe either way.
+    private async Task RunAsync(Func<Task> change)
+    {
+        try
+        {
+            await change();
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+
+        _view = await App.Recipes.GetRecipeAsync(RecipeId);
     }
 
     private static RenderFragment Fact(string label, string value) => __builder =>

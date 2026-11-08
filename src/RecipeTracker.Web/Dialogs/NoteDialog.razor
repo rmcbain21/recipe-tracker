@@ -1,0 +1,35 @@
+@* Asks for a Note's text, for a new Note or an edit. Returns the text typed, or cancels. *@
+<MudDialog>
+    <DialogContent>
+        @if (About.Length > 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-1 note-about">@About</MudText>
+        }
+        <MudTextField @bind-Value="_text" Label="Note" Lines="3" Sizing="InputSizing.Auto" AutoFocus="true" Immediate="true"
+                      Placeholder="Used half the sugar, still sweet enough" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="string.IsNullOrWhiteSpace(_text)">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string CurrentText { get; set; } = "";
+
+    /// <summary>What the Note is on, such as the line's text, shown above the box.</summary>
+    [Parameter]
+    public string About { get; set; } = "";
+
+    private string? _text;
+
+    protected override void OnInitialized() => _text = CurrentText;
+
+    private void Save() => MudDialog.Close(DialogResult.Ok(_text ?? ""));
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -30,6 +30,13 @@ public sealed class RecipeView
 
     public Recipe Recipe { get; }
 
+    /// <summary>The Notes on the whole Recipe, newest first.</summary>
+    public IReadOnlyList<Note> RecipeNotes => NotesFor(null);
+
+    /// <summary>The Notes on an Ingredient Line or Step (or on the whole Recipe, for null), newest first.</summary>
+    public IReadOnlyList<Note> NotesFor(string? targetId) =>
+        Recipe.Notes.Where(note => note.TargetId == targetId).Reverse().ToList();
+
     /// <summary>The Source as shown after "From", or null if the Recipe has none.</summary>
     public ShownSource? Source { get; }
 
