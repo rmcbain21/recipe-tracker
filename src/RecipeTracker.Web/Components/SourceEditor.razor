@@ -13,21 +13,21 @@
 @switch (Source.Kind)
 {
     case SourceKind.Website:
-        <div class="d-flex flex-wrap gap-3">
-            <MudTextField @bind-Value="Source.Url" Label="Web address" InputType="InputType.Url" Immediate="true" Class="flex-grow-1" />
+        <div class="d-flex flex-column gap-1">
+            <MudTextField @bind-Value="Source.Url" Label="Web address" InputType="InputType.Url" Immediate="true" />
             <MudTextField @bind-Value="Source.Name" Label="Site name" Placeholder="@(RecipeTracker.Core.Recipes.Source.HostName(WithScheme(Source.Url)))"
-                          HelperText="@(Source.Name.Length == 0 ? "Left blank, it's taken from the address" : null)" Class="field-medium" />
+                          HelperText="@(Source.Name.Length == 0 ? "Left blank, it's taken from the address" : null)" />
         </div>
         break;
     case SourceKind.Video:
-        <div class="d-flex flex-wrap gap-3">
-            <MudTextField @bind-Value="Source.Url" Label="Video address" InputType="InputType.Url" Class="flex-grow-1" />
-            <MudTextField @bind-Value="Source.Name" Label="Channel" Class="field-medium" />
+        <div class="d-flex flex-column gap-1">
+            <MudTextField @bind-Value="Source.Url" Label="Video address" InputType="InputType.Url" />
+            <MudTextField @bind-Value="Source.Name" Label="Channel" />
         </div>
         break;
     case SourceKind.Book:
-        <div class="d-flex flex-wrap gap-3 align-end">
-            <BookPicker @bind-Value="Source.BookId" Class="flex-grow-1" />
+        <div class="d-flex flex-column gap-1">
+            <BookPicker @bind-Value="Source.BookId" />
             <MudTextField @bind-Value="Source.Page" Label="Page" Class="field-narrow" />
         </div>
         break;
