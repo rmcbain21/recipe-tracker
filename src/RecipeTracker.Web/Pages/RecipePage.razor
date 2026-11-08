@@ -57,6 +57,12 @@ else
         </MudText>
     }
 
+    <TagChips Groups="_view.Tags" Class="mb-2 recipe-tags">
+        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Sell" OnClick="EditTagsAsync" Class="edit-tags">
+            @(_view.Tags.Count == 0 ? "Add Tags" : "Edit")
+        </MudButton>
+    </TagChips>
+
     @if (recipe.Description.Length > 0)
     {
         <MudText Typo="Typo.body1" Class="mb-2 recipe-description">@recipe.Description</MudText>
@@ -221,7 +227,17 @@ else
         }
     }
 
-    // Runs a Note change, shows a rule it breaks, and reloads the Recipe either way.
+    private async Task EditTagsAsync()
+    {
+        var parameters = new DialogParameters<TagPickerDialog> { { d => d.Picked, _view!.Recipe.TagIds } };
+        var dialog = await DialogService.ShowAsync<TagPickerDialog>("Tags", parameters);
+        if (await dialog.Result is { Canceled: false, Data: List<string> picked })
+        {
+            await RunAsync(() => App.Recipes.SetTagsAsync(RecipeId, picked));
+        }
+    }
+
+    // Runs a Note or Tag change, shows a rule it breaks, and reloads the Recipe either way.
     private async Task RunAsync(Func<Task> change)
     {
         try

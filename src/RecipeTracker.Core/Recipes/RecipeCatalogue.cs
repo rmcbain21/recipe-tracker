@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
+using RecipeTracker.Core.Organizing;
 using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Ports;
 using RecipeTracker.Core.Quantities;
@@ -60,7 +61,11 @@ public sealed partial class RecipeCatalogue
 
         // Includes deleted Books, so that a Book deleted on another device still shows its title.
         var book = recipe.Source is { Kind: SourceKind.Book, BookId: { } bookId } ? await _store.LoadAsync<Book>(BookCatalogue.Table, bookId) : null;
-        return new RecipeView(recipe, await IngredientsByIdAsync(), book);
+        var tags = TagCatalogue.GroupForRecipe(
+            recipe.TagIds,
+            await _store.ListAsync<Tag>(TagCatalogue.TagTable),
+            await _store.ListAsync<TagGroup>(TagCatalogue.GroupTable));
+        return new RecipeView(recipe, await IngredientsByIdAsync(), book, tags);
     }
 
     /// <summary>An editor for a new, unsaved Recipe.</summary>
@@ -205,6 +210,20 @@ public sealed partial class RecipeCatalogue
         }
     }
 
+    /// <summary>Sets the Recipe's Tags, as picked on the recipe page. Ids of deleted Tags are dropped.</summary>
+    /// <exception cref="RuleViolationException">The Recipe is gone.</exception>
+    public async Task SetTagsAsync(string recipeId, IEnumerable<string> tagIds)
+    {
+        var recipe = await LoadAsync(recipeId) ?? throw new RuleViolationException("That Recipe has been deleted.");
+        await _store.SaveAsync(Table, recipe with { UpdatedAt = _clock.UtcNow, TagIds = await LiveTagIdsAsync(tagIds) });
+    }
+
+    private async Task<IReadOnlyList<string>> LiveTagIdsAsync(IEnumerable<string> tagIds)
+    {
+        var live = (await _store.ListAsync<Tag>(TagCatalogue.TagTable)).Where(tag => !tag.Deleted).Select(tag => tag.Id).ToHashSet();
+        return tagIds.Distinct().Where(live.Contains).ToList();
+    }
+
     private async Task<Recipe> LoadForNoteAsync(string recipeId) =>
         await LoadAsync(recipeId) ?? throw new RuleViolationException("That Recipe has been deleted.");
 
@@ -240,6 +259,7 @@ public sealed partial class RecipeCatalogue
 
         var books = (await _store.ListAsync<Book>(BookCatalogue.Table)).Where(book => !book.Deleted).Select(book => book.Id).ToHashSet();
         var source = editor.Source.ToSource(books.Contains);
+        var tagIds = await LiveTagIdsAsync(editor.TagIds);
 
         var now = _clock.UtcNow;
         var known =(await _store.ListAsync<Ingredient>(IngredientCatalogue.Table)).Where(i => !i.Deleted).ToList();
@@ -288,6 +308,7 @@ public sealed partial class RecipeCatalogue
             Title = title,
             IsDraft = asDraft,
             Source = source,
+            TagIds = tagIds,
             Description = editor.Description.Trim(),
             Yield = editor.YieldAmount is null && label.Length == 0 ? null : new Yield(editor.YieldAmount, label),
             StatedTimes = new StatedTimes(editor.PrepMinutes, editor.CookMinutes, editor.TotalMinutes),

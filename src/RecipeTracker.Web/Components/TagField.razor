@@ -1,0 +1,50 @@
+@* The Recipe editor's Tags: the picked Tags as removable chips, and a button that opens the Tag picker. Changes the editor's TagIds. *@
+@using RecipeTracker.Core.Organizing
+@inject AppCore App
+@inject IDialogService DialogService
+
+<TagChips Groups="_shown" OnRemove="Remove">
+    <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Sell" OnClick="PickAsync" Class="edit-tags">
+        @(TagIds.Count == 0 ? "Add Tags" : "Edit Tags")
+    </MudButton>
+</TagChips>
+
+@code {
+    [Parameter, EditorRequired]
+    public List<string> TagIds { get; set; } = default!;
+
+    private IReadOnlyList<GroupedTags<Tag>> _all = [];
+    private IReadOnlyList<GroupedTags<Tag>> _shown = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _all = await App.Tags.ListGroupedTagsAsync();
+        Refresh();
+    }
+
+    private async Task PickAsync()
+    {
+        var parameters = new DialogParameters<TagPickerDialog> { { d => d.Picked, TagIds.ToList() } };
+        var dialog = await DialogService.ShowAsync<TagPickerDialog>("Tags", parameters);
+        if (await dialog.Result is { Canceled: false, Data: List<string> picked })
+        {
+            TagIds.Clear();
+            TagIds.AddRange(picked);
+            _all = await App.Tags.ListGroupedTagsAsync(); // the picker may have added a Tag
+            Refresh();
+        }
+    }
+
+    private void Remove(Tag tag)
+    {
+        TagIds.Remove(tag.Id);
+        Refresh();
+    }
+
+    // Shows the picked Tags grouped like the recipe page, leaving out groups with none picked.
+    private void Refresh() =>
+        _shown = _all
+            .Select(group => new GroupedTags<Tag>(group.Group, group.Tags.Where(t => TagIds.Contains(t.Id)).ToList()))
+            .Where(group => group.Tags.Count > 0)
+            .ToList();
+}

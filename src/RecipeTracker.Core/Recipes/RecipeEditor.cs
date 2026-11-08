@@ -24,6 +24,7 @@ public sealed class RecipeEditor
         Title = original.Title;
         IsDraft = original.IsDraft;
         Source = EditedSource.From(original.Source);
+        TagIds.AddRange(original.TagIds);
         Description = original.Description;
         YieldAmount = original.Yield?.Amount;
         YieldLabel = original.Yield?.Label ?? "";
@@ -78,6 +79,9 @@ public sealed class RecipeEditor
 
     /// <summary>The Source being edited; its Kind is null for none.</summary>
     public EditedSource Source { get; private set; } = new();
+
+    /// <summary>The ids of the Tags picked for the Recipe. Ids of Tags deleted meanwhile are dropped on saving.</summary>
+    public List<string> TagIds { get; } = [];
 
     public string Description { get; set; } = "";
 

@@ -1,0 +1,216 @@
+@page "/tags"
+@using RecipeTracker.Core.Organizing
+@inject AppCore App
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Tags</PageTitle>
+
+<MudButton Href="settings" Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Class="mb-1 ml-n2">Settings</MudButton>
+
+<div class="d-flex align-center mb-2">
+    <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">Tags</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.CreateNewFolder" Color="Color.Primary" OnClick="AddGroupAsync">New Tag Group</MudButton>
+</div>
+
+@if (_groups is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    @for (var index = 0; index < _groups.Count; index++)
+    {
+        var grouped = _groups[index];
+        var group = grouped.Group;
+        var isFirst = index == 0;
+        var isLastGroup = group is not null && (index == _groups.Count - 1 || _groups[index + 1].Group is null);
+        <MudPaper Outlined="true" Elevation="0" Class="pa-2 mb-3 tag-group" @key="@(group?.Id ?? "ungrouped")">
+            <div class="d-flex align-center">
+                <MudText Typo="Typo.subtitle1" HtmlTag="h2" Class="flex-grow-1 tag-group-heading">@(group?.Name ?? "Ungrouped")</MudText>
+                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="() => AddTagAsync(group)">Add Tag</MudButton>
+                @if (group is not null)
+                {
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true" AriaLabel="@($"{group.Name} options")">
+                        <MudMenuItem OnClick="() => RenameGroupAsync(group)">Rename</MudMenuItem>
+                        <MudMenuItem OnClick="() => MoveGroupAsync(group, -1)" Disabled="isFirst">Move up</MudMenuItem>
+                        <MudMenuItem OnClick="() => MoveGroupAsync(group, +1)" Disabled="isLastGroup">Move down</MudMenuItem>
+                        <MudMenuItem OnClick="() => DeleteGroupAsync(grouped)">Delete</MudMenuItem>
+                    </MudMenu>
+                }
+            </div>
+            @if (grouped.Tags.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary pa-1">
+                    @(group is null ? "Tags with no group show here." : "No Tags yet.")
+                </MudText>
+            }
+            @foreach (var use in grouped.Tags)
+            {
+                var tag = use.Tag;
+                <div class="d-flex align-center tag-row" @key="tag.Id">
+                    <MudText Typo="Typo.body1" Class="flex-grow-1 pl-1">@tag.Name</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mr-1">@use.RecipeCount @(use.RecipeCount == 1 ? "Recipe" : "Recipes")</MudText>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Small" Dense="true" AriaLabel="@($"{tag.Name} options")">
+                        <MudMenuItem OnClick="() => RenameTagAsync(tag)">Rename</MudMenuItem>
+                        <MudMenuItem OnClick="() => MoveTagAsync(tag)">Move to group</MudMenuItem>
+                        <MudMenuItem OnClick="() => MergeTagAsync(use)">Merge into…</MudMenuItem>
+                        <MudMenuItem OnClick="() => DeleteTagAsync(use)">Delete</MudMenuItem>
+                    </MudMenu>
+                </div>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    private IReadOnlyList<GroupedTags<TagUse>>? _groups;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => _groups = await App.Tags.ListTagUsesAsync();
+
+    private IEnumerable<TagUse> AllTags => _groups!.SelectMany(g => g.Tags);
+
+    // Runs a change, shows a rule it breaks, and reloads either way.
+    private async Task RunAsync(Func<Task> change)
+    {
+        try
+        {
+            await change();
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task<string?> AskNameAsync(string title, string label, string current = "", string saveText = "Save")
+    {
+        var parameters = new DialogParameters<NameDialog>
+        {
+            { d => d.Label, label },
+            { d => d.CurrentName, current },
+            { d => d.SaveText, saveText },
+        };
+        var dialog = await DialogService.ShowAsync<NameDialog>(title, parameters);
+        return await dialog.Result is { Canceled: false, Data: string name } ? name : null;
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string message, string yesText) =>
+        await DialogService.ShowMessageBoxAsync(title, message, yesText: yesText, cancelText: "Cancel") == true;
+
+    private async Task<string?> ChooseAsync(string title, string label, IReadOnlyList<(string Key, string Label)> options, string chooseText, Func<string, string>? preview = null)
+    {
+        var parameters = new DialogParameters<ChoiceDialog>
+        {
+            { d => d.Options, options },
+            { d => d.Label, label },
+            { d => d.ChooseText, chooseText },
+            { d => d.Preview, preview },
+        };
+        var dialog = await DialogService.ShowAsync<ChoiceDialog>(title, parameters);
+        return await dialog.Result is { Canceled: false, Data: string key } ? key : null;
+    }
+
+    private static string Recipes(int count) => $"{count} {(count == 1 ? "Recipe" : "Recipes")}";
+
+    // Tag Groups
+
+    private async Task AddGroupAsync()
+    {
+        if (await AskNameAsync("New Tag Group", "Name", saveText: "Add") is { } name)
+        {
+            await RunAsync(() => App.Tags.AddTagGroupAsync(name));
+        }
+    }
+
+    private async Task RenameGroupAsync(TagGroup group)
+    {
+        if (await AskNameAsync("Rename Tag Group", "Name", group.Name) is { } name)
+        {
+            await RunAsync(() => App.Tags.RenameTagGroupAsync(group.Id, name));
+        }
+    }
+
+    private Task MoveGroupAsync(TagGroup group, int offset) => RunAsync(() => App.Tags.MoveTagGroupAsync(group.Id, offset));
+
+    private async Task DeleteGroupAsync(GroupedTags<TagUse> grouped)
+    {
+        var count = grouped.Tags.Count;
+        var message = count == 0
+            ? $"\"{grouped.Group!.Name}\" will be deleted."
+            : $"\"{grouped.Group!.Name}\" will be deleted. Its {count} {(count == 1 ? "Tag stays" : "Tags stay")}, ungrouped.";
+        if (await ConfirmAsync("Delete Tag Group?", message, "Delete"))
+        {
+            await RunAsync(() => App.Tags.DeleteTagGroupAsync(grouped.Group.Id));
+        }
+    }
+
+    // Tags
+
+    private async Task AddTagAsync(TagGroup? group)
+    {
+        var title = group is null ? "New Tag" : $"New Tag in {group.Name}";
+        if (await AskNameAsync(title, "Name", saveText: "Add") is { } name)
+        {
+            await RunAsync(() => App.Tags.AddTagAsync(name, group?.Id));
+        }
+    }
+
+    private async Task RenameTagAsync(Tag tag)
+    {
+        if (await AskNameAsync("Rename Tag", "Name", tag.Name) is { } name)
+        {
+            await RunAsync(() => App.Tags.RenameTagAsync(tag.Id, name));
+        }
+    }
+
+    private async Task MoveTagAsync(Tag tag)
+    {
+        const string NoGroup = "";
+        var options = _groups!
+            .Where(g => g.Group is not null && g.Group.Id != tag.GroupId)
+            .Select(g => (g.Group!.Id, g.Group.Name))
+            .ToList();
+        if (tag.GroupId is not null)
+        {
+            options.Add((NoGroup, "No group"));
+        }
+
+        if (await ChooseAsync($"Move \"{tag.Name}\"", "Tag Group", options, "Move") is { } key)
+        {
+            await RunAsync(() => App.Tags.MoveTagToGroupAsync(tag.Id, key == NoGroup ? null : key));
+        }
+    }
+
+    private async Task MergeTagAsync(TagUse use)
+    {
+        var tag = use.Tag;
+        var options = _groups!
+            .SelectMany(g => g.Tags.Select(t => (t.Tag.Id, g.Group is null ? t.Tag.Name : $"{t.Tag.Name} ({g.Group.Name})")))
+            .Where(o => o.Id != tag.Id)
+            .ToList();
+        string Preview(string intoId) =>
+            $"{Recipes(use.RecipeCount)} tagged \"{tag.Name}\" will be tagged \"{AllTags.First(t => t.Tag.Id == intoId).Tag.Name}\" instead, and \"{tag.Name}\" will be deleted.";
+
+        if (await ChooseAsync($"Merge \"{tag.Name}\"", "Merge into", options, "Merge", Preview) is { } intoId)
+        {
+            await RunAsync(() => App.Tags.MergeTagAsync(tag.Id, intoId));
+        }
+    }
+
+    private async Task DeleteTagAsync(TagUse use)
+    {
+        var message = use.RecipeCount == 0
+            ? $"\"{use.Tag.Name}\" will be deleted."
+            : $"\"{use.Tag.Name}\" will be deleted and taken off {Recipes(use.RecipeCount)}.";
+        if (await ConfirmAsync("Delete Tag?", message, "Delete"))
+        {
+            await RunAsync(() => App.Tags.DeleteTagAsync(use.Tag.Id));
+        }
+    }
+}

@@ -1,0 +1,46 @@
+@* Asks the Cook to pick one of a few options, such as the Tag Group to move a Tag to. Returns the chosen option's key, or cancels. *@
+<MudDialog>
+    <DialogContent>
+        <MudSelect T="string" @bind-Value="Chosen" Label="@Label" Dense="true" ToStringFunc="LabelOf" AnchorOrigin="Origin.BottomCenter">
+            @foreach (var option in Options)
+            {
+                <MudSelectItem T="string" Value="option.Key">@option.Label</MudSelectItem>
+            }
+        </MudSelect>
+        @if (Preview is not null && Chosen is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mt-3 choice-preview">@Preview(Chosen)</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Choose" Disabled="Chosen is null">@ChooseText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The options as (key, label). Keys must be distinct and not null.</summary>
+    [Parameter]
+    public IReadOnlyList<(string Key, string Label)> Options { get; set; } = [];
+
+    [Parameter]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string ChooseText { get; set; } = "OK";
+
+    /// <summary>What choosing an option will do, shown under the list once one is picked.</summary>
+    [Parameter]
+    public Func<string, string>? Preview { get; set; }
+
+    private string? Chosen { get; set; }
+
+    private string LabelOf(string? key) => Options.FirstOrDefault(o => o.Key == key).Label ?? "";
+
+    private void Choose() => MudDialog.Close(DialogResult.Ok(Chosen!));
+
+    private void Cancel() => MudDialog.Cancel();
+}

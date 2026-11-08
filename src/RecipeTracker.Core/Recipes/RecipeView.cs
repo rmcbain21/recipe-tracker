@@ -1,14 +1,16 @@
 using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
+using RecipeTracker.Core.Organizing;
 
 namespace RecipeTracker.Core.Recipes;
 
 /// <summary>A Recipe as its recipe page shows it: ingredients grouped by section, with their Ingredients' names.</summary>
 public sealed class RecipeView
 {
-    internal RecipeView(Recipe recipe, IReadOnlyDictionary<string, Ingredient> ingredients, Book? book)
+    internal RecipeView(Recipe recipe, IReadOnlyDictionary<string, Ingredient> ingredients, Book? book, IReadOnlyList<GroupedTags<Tag>> tags)
     {
         Recipe = recipe;
+        Tags = tags;
         Source = ShowSource(recipe.Source, book);
 
         var sectionIds = recipe.Sections.Select(section => section.Id).ToHashSet();
@@ -29,6 +31,9 @@ public sealed class RecipeView
     }
 
     public Recipe Recipe { get; }
+
+    /// <summary>The Recipe's Tags, by Tag Group in the Cook's order, ungrouped last; groups it has no Tags in are left out.</summary>
+    public IReadOnlyList<GroupedTags<Tag>> Tags { get; }
 
     /// <summary>The Notes on the whole Recipe, newest first.</summary>
     public IReadOnlyList<Note> RecipeNotes => NotesFor(null);

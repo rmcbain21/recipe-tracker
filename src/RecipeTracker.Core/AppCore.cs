@@ -1,5 +1,6 @@
 using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
+using RecipeTracker.Core.Organizing;
 using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Ports;
 using RecipeTracker.Core.Recipes;
@@ -17,7 +18,10 @@ public sealed class AppCore
         Recipes = new RecipeCatalogue(store, clock, new RuleBasedRecipeParser());
         Ingredients = new IngredientCatalogue(store);
         Books = new BookCatalogue(store, clock);
+        Tags = new TagCatalogue(store, clock);
     }
+
+    public TagCatalogue Tags { get; }
 
     public BookCatalogue Books { get; }
 

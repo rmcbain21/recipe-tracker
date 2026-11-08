@@ -1,0 +1,120 @@
+@* Picks a Recipe's Tags from the Cook's Tags grouped by Tag Group, or adds a new one typed in the box. Returns the picked Tag ids. *@
+@using RecipeTracker.Core.Organizing
+@inject AppCore App
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_typed" Label="Find or add a Tag" Immediate="true" AutoFocus="true" Clearable="true"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" OnKeyUp="OnKeyUp" Class="mb-2" />
+        @if (CanAdd)
+        {
+            <MudButton StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Small" Class="mb-2 add-tag"
+                       OnClick="AddTypedAsync">Add "@TagNames.Tidy(_typed)"</MudButton>
+        }
+        @if (_groups is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @foreach (var group in _groups)
+            {
+                var tags = group.Tags.Where(Matches).ToList();
+                if (tags.Count == 0)
+                {
+                    continue;
+                }
+
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">@(group.Group?.Name ?? "Other Tags")</MudText>
+                <div class="d-flex flex-wrap gap-1 mb-1">
+                    @foreach (var tag in tags)
+                    {
+                        var picked = _picked.Contains(tag.Id);
+                        <MudChip T="string" Size="Size.Small" Color="@(picked ? Color.Primary : Color.Default)"
+                                 Variant="@(picked ? Variant.Filled : Variant.Outlined)" Class="ml-0 tag-choice"
+                                 Icon="@(picked ? Icons.Material.Filled.Check : null)" OnClick="() => Toggle(tag.Id)">@tag.Name</MudChip>
+                    }
+                </div>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Done">Done</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The Tag ids picked so far.</summary>
+    [Parameter]
+    public IReadOnlyList<string> Picked { get; set; } = [];
+
+    private IReadOnlyList<GroupedTags<Tag>>? _groups;
+    private HashSet<string> _picked = [];
+    private string? _typed;
+
+    private bool CanAdd =>
+        _groups is not null && TagNames.Tidy(_typed).Length > 0
+        && !_groups.SelectMany(g => g.Tags).Any(t => TagNames.Same(t.Name, _typed!));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _picked = Picked.ToHashSet();
+        _groups = await App.Tags.ListGroupedTagsAsync();
+    }
+
+    private bool Matches(Tag tag) =>
+        string.IsNullOrWhiteSpace(_typed) || tag.Name.Contains(TagNames.Tidy(_typed), StringComparison.CurrentCultureIgnoreCase);
+
+    private void Toggle(string id)
+    {
+        if (!_picked.Remove(id))
+        {
+            _picked.Add(id);
+        }
+    }
+
+    // Enter picks the only match, or adds the typed name when nothing matches it exactly.
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter" || _groups is null)
+        {
+            return;
+        }
+
+        var matches = _groups.SelectMany(g => g.Tags).Where(Matches).ToList();
+        var exact = matches.FirstOrDefault(t => TagNames.Same(t.Name, _typed ?? ""));
+        if (exact is not null || matches.Count == 1)
+        {
+            _picked.Add((exact ?? matches[0]).Id);
+            _typed = "";
+        }
+        else if (CanAdd)
+        {
+            await AddTypedAsync();
+        }
+    }
+
+    private async Task AddTypedAsync()
+    {
+        try
+        {
+            var tag = await App.Tags.AddTagAsync(_typed ?? "");
+            _picked.Add(tag.Id);
+            _typed = "";
+            _groups = await App.Tags.ListGroupedTagsAsync();
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private void Done() => MudDialog.Close(DialogResult.Ok(_picked.ToList()));
+
+    private void Cancel() => MudDialog.Cancel();
+}

@@ -1,0 +1,38 @@
+@* A Recipe's Tags as chips, grouped in Tag Group order with ungrouped last. Each group's name leads its chips. *@
+@using RecipeTracker.Core.Organizing
+
+<div class="tag-chips d-flex flex-wrap align-center gap-1 @Class">
+    @foreach (var group in Groups)
+    {
+        <span class="tag-group-name">@(group.Group?.Name ?? "Tags")</span>
+        @foreach (var tag in group.Tags)
+        {
+            @if (OnRemove.HasDelegate)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Class="ml-0 mr-2"
+                         OnClose="() => OnRemove.InvokeAsync(tag)">@tag.Name</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Class="ml-0 mr-2">@tag.Name</MudChip>
+            }
+        }
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<GroupedTags<Tag>> Groups { get; set; } = [];
+
+    /// <summary>When set, each chip has a close button that calls this.</summary>
+    [Parameter]
+    public EventCallback<Tag> OnRemove { get; set; }
+
+    /// <summary>Shown after the chips, such as an edit button.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+}

@@ -252,3 +252,14 @@ h1:focus {
 .original-text {
     font-style: italic;
 }
+
+/* A Recipe's Tags: each Tag Group's name leads its chips. */
+.tag-group-name {
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.tag-row {
+    min-height: 2.25rem;
+    border-top: 1px solid var(--mud-palette-lines-default);
+}

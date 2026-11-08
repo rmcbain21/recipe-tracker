@@ -20,6 +20,9 @@ public sealed record Recipe : StoredRecord
 
     public Source? Source { get; init; }
 
+    /// <summary>The ids of the Tags on the Recipe.</summary>
+    public IReadOnlyList<string> TagIds { get; init; } = [];
+
     public string Description { get; init; } = "";
 
     /// <summary>How much it makes, such as "4 servings"; null if the Source doesn't say.</summary>
