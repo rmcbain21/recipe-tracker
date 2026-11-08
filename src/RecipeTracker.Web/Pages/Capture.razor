@@ -25,10 +25,6 @@ else
         <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">Review</MudText>
         <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="() => _editor = null">Back to text</MudButton>
     </div>
-    @if (_editor.Source is { Url.Length: > 0 } source)
-    {
-        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">From @source.Url</MudText>
-    }
     <RecipeSaveActions Editor="_editor" Finishing="true" Class="mb-3" />
     <RecipeEditorForm Editor="_editor" />
     <RecipeSaveActions Editor="_editor" Finishing="true" Class="mb-6" />

@@ -216,7 +216,7 @@ public class CaptureTests
         editor.ConfirmAllMatches();
         var recipe = await app.Recipes.SaveAsync(editor);
 
-        Assert.Equal(Source.Website("https://example.com/scallion-pancakes"), recipe.Source);
+        Assert.Equal(new Source { Kind = SourceKind.Website, Url = "https://example.com/scallion-pancakes", Name = "example.com" }, recipe.Source);
         Assert.Equal(recipe.Source, (await app.Recipes.GetRecipeAsync(recipe.Id))!.Recipe.Source);
     }
 

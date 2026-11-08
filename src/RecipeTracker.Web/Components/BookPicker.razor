@@ -1,0 +1,48 @@
+@* Picks one of the Cook's Books for a Source, or adds a new one there and then. *@
+@using RecipeTracker.Core.Books
+@inject AppCore App
+@inject IDialogService DialogService
+
+<div class="d-flex align-end gap-1 @Class">
+    <MudSelect T="string" Value="Value" ValueChanged="ValueChanged" Label="Book" Dense="true" Class="flex-grow-1"
+               Placeholder="@(_books.Count == 0 ? "Add your first Book" : null)" ToStringFunc="TitleOf">
+        @foreach (var book in _books)
+        {
+            <MudSelectItem T="string" Value="book.Id">
+                @book.Title
+                @if (book.Author.Length > 0)
+                {
+                    <span class="mud-text-secondary"> · @book.Author</span>
+                }
+            </MudSelectItem>
+        }
+    </MudSelect>
+    <MudIconButton Icon="@Icons.Material.Filled.LibraryAdd" aria-label="New Book" title="New Book" OnClick="AddAsync" />
+</div>
+
+@code {
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    private IReadOnlyList<Book> _books = [];
+
+    protected override async Task OnInitializedAsync() => _books = await App.Books.ListBooksAsync();
+
+    private string TitleOf(string? id) => _books.FirstOrDefault(book => book.Id == id)?.Title ?? "";
+
+    private async Task AddAsync()
+    {
+        var dialog = await DialogService.ShowAsync<BookDialog>("New Book");
+        if (await dialog.Result is { Canceled: false, Data: Book book })
+        {
+            _books = await App.Books.ListBooksAsync();
+            await ValueChanged.InvokeAsync(book.Id);
+        }
+    }
+}

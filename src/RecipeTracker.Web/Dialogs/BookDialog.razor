@@ -1,0 +1,72 @@
+@* Adds a Book, or edits one, and saves it. Returns the saved Book, or cancels. A rule the Book breaks shows here and keeps the dialog open. *@
+@using RecipeTracker.Core.Books
+@inject AppCore App
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_title" Label="Title" AutoFocus="true" Immediate="true" OnKeyUp="OnKeyUp" />
+        <MudTextField @bind-Value="_author" Label="Author" Immediate="true" OnKeyUp="OnKeyUp" />
+        @if (_error is not null)
+        {
+            <MudText Color="Color.Error" Typo="Typo.body2" Class="mt-2">@_error</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">@(Book is null ? "Add" : "Save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>The Book to edit, or null to add one.</summary>
+    [Parameter]
+    public Book? Book { get; set; }
+
+    /// <summary>A title to start a new Book with.</summary>
+    [Parameter]
+    public string InitialTitle { get; set; } = "";
+
+    private string? _title;
+    private string? _author;
+    private string? _error;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        _title = Book?.Title ?? InitialTitle;
+        _author = Book?.Author ?? "";
+    }
+
+    private async Task OnKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveAsync();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            var saved = Book is null
+                ? await App.Books.AddBookAsync(_title ?? "", _author ?? "")
+                : await App.Books.EditBookAsync(Book.Id, _title ?? "", _author ?? "");
+            MudDialog.Close(DialogResult.Ok(saved));
+        }
+        catch (RuleViolationException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

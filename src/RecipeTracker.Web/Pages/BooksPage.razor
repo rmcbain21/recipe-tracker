@@ -1,0 +1,101 @@
+@page "/books"
+@using RecipeTracker.Core.Books
+@inject AppCore App
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Books</PageTitle>
+
+<MudButton Href="settings" Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.ArrowBack"
+           Class="mb-1 ml-n2">Settings</MudButton>
+
+<div class="d-flex align-center mb-2">
+    <MudText Typo="Typo.h5" HtmlTag="h1" Class="flex-grow-1">Books</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.LibraryAdd" Color="Color.Primary" OnClick="AddAsync">New Book</MudButton>
+</div>
+
+@if (_books is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_books.Count == 0)
+{
+    <MudPaper Class="pa-6 d-flex flex-column align-center gap-2" Elevation="0" Outlined="true">
+        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Large" Color="Color.Primary" />
+        <MudText Typo="Typo.body1">No Books yet.</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Add a cookbook once, then pick it as the Source of every Recipe from it.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper>
+        <MudList T="string" Class="book-list">
+            @foreach (var summary in _books)
+            {
+                var book = summary.Book;
+                <MudListItem T="string" @key="book.Id">
+                    <div class="d-flex align-center gap-2">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.body1"><em>@book.Title</em></MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                                @(book.Author.Length > 0 ? $"{book.Author} · " : "")@summary.RecipeCount @(summary.RecipeCount == 1 ? "Recipe" : "Recipes")
+                            </MudText>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="@($"Edit {book.Title}")"
+                                       OnClick="() => EditAsync(book)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="@($"Delete {book.Title}")"
+                                       OnClick="() => DeleteAsync(book)" />
+                    </div>
+                </MudListItem>
+                <MudDivider />
+            }
+        </MudList>
+    </MudPaper>
+}
+
+@code {
+    private IReadOnlyList<BookSummary>? _books;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => _books = await App.Books.ListBookSummariesAsync();
+
+    private async Task AddAsync()
+    {
+        var dialog = await DialogService.ShowAsync<BookDialog>("New Book");
+        if (await dialog.Result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task EditAsync(Book book)
+    {
+        var parameters = new DialogParameters<BookDialog> { { d => d.Book, book } };
+        var dialog = await DialogService.ShowAsync<BookDialog>("Edit Book", parameters);
+        if (await dialog.Result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(Book book)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete Book?", $"\"{book.Title}\" will be deleted.", yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await App.Books.DeleteBookAsync(book.Id);
+            await LoadAsync();
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+}

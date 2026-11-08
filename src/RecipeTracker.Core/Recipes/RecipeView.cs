@@ -1,3 +1,4 @@
+using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
 
 namespace RecipeTracker.Core.Recipes;
@@ -5,9 +6,10 @@ namespace RecipeTracker.Core.Recipes;
 /// <summary>A Recipe as its recipe page shows it: ingredients grouped by section, with their Ingredients' names.</summary>
 public sealed class RecipeView
 {
-    internal RecipeView(Recipe recipe, IReadOnlyDictionary<string, Ingredient> ingredients)
+    internal RecipeView(Recipe recipe, IReadOnlyDictionary<string, Ingredient> ingredients, Book? book)
     {
         Recipe = recipe;
+        Source = ShowSource(recipe.Source, book);
 
         var sectionIds = recipe.Sections.Select(section => section.Id).ToHashSet();
         var groups = new List<IngredientGroup>();
@@ -27,6 +29,21 @@ public sealed class RecipeView
     }
 
     public Recipe Recipe { get; }
+
+    /// <summary>The Source as shown after "From", or null if the Recipe has none.</summary>
+    public ShownSource? Source { get; }
+
+    private static ShownSource? ShowSource(Source? source, Book? book) => source switch
+    {
+        null => null,
+        { Kind: SourceKind.Book } => new ShownSource(SourceKind.Book, book?.Title ?? "Unknown Book", null, source.Page),
+        { Kind: SourceKind.Other } => new ShownSource(SourceKind.Other, source.Text, null, ""),
+        _ => new ShownSource(
+            source.Kind,
+            source.Name.Length > 0 ? source.Name : RecipeTracker.Core.Recipes.Source.HostName(source.Url) ?? source.Url,
+            Uri.TryCreate(source.Url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? source.Url : null,
+            ""),
+    };
 
     /// <summary>The Ingredient Lines grouped as shown: the lines with no section first (when there are any), then each section.</summary>
     public IReadOnlyList<IngredientGroup> Ingredients { get; }

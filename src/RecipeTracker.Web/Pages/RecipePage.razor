@@ -36,10 +36,22 @@ else
         </MudAlert>
     }
 
-    @if (recipe.Source is { Kind: SourceKind.Website, Url.Length: > 0 } source)
+    @if (_view.Source is { } source)
     {
         <MudText Typo="Typo.body2" Class="mb-2 recipe-source">
-            From <MudLink Href="@source.Url" Target="_blank" rel="noopener">@(Uri.TryCreate(source.Url, UriKind.Absolute, out var uri) ? uri.Host : source.Url)</MudLink>
+            From
+            @if (source.Url is not null)
+            {
+                <MudLink Href="@source.Url" Target="_blank" rel="noopener">@source.Name</MudLink>
+            }
+            else if (source.Kind == SourceKind.Book)
+            {
+                <em>@source.Name</em>@source.PageText
+            }
+            else
+            {
+                @source.Name
+            }
         </MudText>
     }
 

@@ -1,0 +1,16 @@
+@page "/settings"
+
+@* For now only links to the Books page. Sync, backup, Appearance and Text size arrive with issue 02, and Ingredients with issue 13. *@
+
+<PageTitle>Settings</PageTitle>
+
+<MudText Typo="Typo.h5" HtmlTag="h1" Class="mb-4">Settings</MudText>
+
+<MudPaper>
+    <MudList T="string">
+        <MudListItem T="string" Href="books" Icon="@Icons.Material.Filled.LibraryBooks">
+            <MudText Typo="Typo.body1">Books</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">The cookbooks your Recipes come from</MudText>
+        </MudListItem>
+    </MudList>
+</MudPaper>

@@ -23,7 +23,7 @@ public sealed class RecipeEditor
 
         Title = original.Title;
         IsDraft = original.IsDraft;
-        Source = original.Source;
+        Source = EditedSource.From(original.Source);
         Description = original.Description;
         YieldAmount = original.Yield?.Amount;
         YieldLabel = original.Yield?.Label ?? "";
@@ -76,7 +76,8 @@ public sealed class RecipeEditor
     /// <summary>True if the Recipe was last saved as a Draft. A new Recipe isn't a Draft until it's saved as one.</summary>
     public bool IsDraft { get; }
 
-    public Source? Source { get; set; }
+    /// <summary>The Source being edited; its Kind is null for none.</summary>
+    public EditedSource Source { get; private set; } = new();
 
     public string Description { get; set; } = "";
 

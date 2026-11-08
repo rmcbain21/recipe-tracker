@@ -16,6 +16,9 @@
 
 <MudTextField @bind-Value="Editor.Title" Label="Title" Immediate="true" AutoFocus="AutoFocusTitle" Class="mb-2" />
 <MudTextField @bind-Value="Editor.Description" Label="Description" Lines="2" Sizing="InputSizing.Auto" Class="mb-2" />
+<div class="mb-3">
+    <SourceEditor Source="Editor.Source" />
+</div>
 
 <div class="d-flex flex-wrap gap-3 mb-2">
     <MudNumericField T="decimal?" @bind-Value="Editor.YieldAmount" Label="Makes" Min="0" HideSpinButtons="true" Class="field-narrow" />

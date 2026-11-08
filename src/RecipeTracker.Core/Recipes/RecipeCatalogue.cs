@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
 using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Ports;
@@ -52,7 +53,14 @@ public sealed partial class RecipeCatalogue
     public async Task<RecipeView?> GetRecipeAsync(string id)
     {
         var recipe = await LoadAsync(id);
-        return recipe is null ? null : new RecipeView(recipe, await IngredientsByIdAsync());
+        if (recipe is null)
+        {
+            return null;
+        }
+
+        // Includes deleted Books, so that a Book deleted on another device still shows its title.
+        var book = recipe.Source is { Kind: SourceKind.Book, BookId: { } bookId } ? await _store.LoadAsync<Book>(BookCatalogue.Table, bookId) : null;
+        return new RecipeView(recipe, await IngredientsByIdAsync(), book);
     }
 
     /// <summary>An editor for a new, unsaved Recipe.</summary>
@@ -89,7 +97,11 @@ public sealed partial class RecipeCatalogue
 
         var editor = NewRecipe();
         editor.Title = parsed.Title.Length > 0 ? parsed.Title : (title ?? "").Trim();
-        editor.Source = string.IsNullOrWhiteSpace(url) ? null : Source.Website(url);
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            editor.Source.Kind = SourceKind.Website;
+            editor.Source.Url = url.Trim();
+        }
         editor.YieldAmount = parsed.Yield?.Amount;
         editor.YieldLabel = parsed.Yield?.Label ?? "";
         editor.PrepMinutes = parsed.StatedTimes.PrepMinutes;
@@ -173,8 +185,11 @@ public sealed partial class RecipeCatalogue
             throw new RuleViolationException("Times can't be negative.");
         }
 
+        var books = (await _store.ListAsync<Book>(BookCatalogue.Table)).Where(book => !book.Deleted).Select(book => book.Id).ToHashSet();
+        var source = editor.Source.ToSource(books.Contains);
+
         var now = _clock.UtcNow;
-        var known = (await _store.ListAsync<Ingredient>(IngredientCatalogue.Table)).Where(i => !i.Deleted).ToList();
+        var known =(await _store.ListAsync<Ingredient>(IngredientCatalogue.Table)).Where(i => !i.Deleted).ToList();
         var created = new List<Ingredient>();
         var lines = new List<IngredientLine>();
 
@@ -219,7 +234,7 @@ public sealed partial class RecipeCatalogue
             UpdatedAt = now,
             Title = title,
             IsDraft = asDraft,
-            Source = editor.Source,
+            Source = source,
             Description = editor.Description.Trim(),
             Yield = editor.YieldAmount is null && label.Length == 0 ? null : new Yield(editor.YieldAmount, label),
             StatedTimes = new StatedTimes(editor.PrepMinutes, editor.CookMinutes, editor.TotalMinutes),

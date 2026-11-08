@@ -1,0 +1,46 @@
+@* A Recipe's Source: pick a kind, then that kind's fields. Fields typed for another kind are kept until saving, in case the Cook switches back. *@
+@using RecipeTracker.Core.Recipes
+
+<MudSelect T="SourceKind?" @bind-Value="Source.Kind" Label="Source" Dense="true" Class="field-medium mb-1"
+           ToStringFunc="@(kind => kind?.ToString() ?? "None")">
+    <MudSelectItem T="SourceKind?" Value="null">None</MudSelectItem>
+    @foreach (var kind in Enum.GetValues<SourceKind>())
+    {
+        <MudSelectItem T="SourceKind?" Value="kind">@kind</MudSelectItem>
+    }
+</MudSelect>
+
+@switch (Source.Kind)
+{
+    case SourceKind.Website:
+        <div class="d-flex flex-wrap gap-3">
+            <MudTextField @bind-Value="Source.Url" Label="Web address" InputType="InputType.Url" Immediate="true" Class="flex-grow-1" />
+            <MudTextField @bind-Value="Source.Name" Label="Site name" Placeholder="@(RecipeTracker.Core.Recipes.Source.HostName(WithScheme(Source.Url)))"
+                          HelperText="@(Source.Name.Length == 0 ? "Left blank, it's taken from the address" : null)" Class="field-medium" />
+        </div>
+        break;
+    case SourceKind.Video:
+        <div class="d-flex flex-wrap gap-3">
+            <MudTextField @bind-Value="Source.Url" Label="Video address" InputType="InputType.Url" Class="flex-grow-1" />
+            <MudTextField @bind-Value="Source.Name" Label="Channel" Class="field-medium" />
+        </div>
+        break;
+    case SourceKind.Book:
+        <div class="d-flex flex-wrap gap-3 align-end">
+            <BookPicker @bind-Value="Source.BookId" Class="flex-grow-1" />
+            <MudTextField @bind-Value="Source.Page" Label="Page" Class="field-narrow" />
+        </div>
+        break;
+    case SourceKind.Other:
+        <MudTextField @bind-Value="Source.Text" Label="Where it's from" Placeholder="Grandma" />
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public EditedSource Source { get; set; } = default!;
+
+    // The site name placeholder previews what saving fills in, so "seriouseats.com/x" counts as an address too.
+    private static string WithScheme(string url) =>
+        url.Contains("://", StringComparison.Ordinal) || url.Trim().Length == 0 ? url : "https://" + url.Trim();
+}
