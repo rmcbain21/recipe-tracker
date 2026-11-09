@@ -1,4 +1,5 @@
 @page "/recipes/{RecipeId}"
+@using RecipeTracker.Core.Cooking
 @using RecipeTracker.Core.Recipes
 @using RecipeTracker.Core.Quantities
 @inject AppCore App
@@ -107,6 +108,33 @@ else
                    OnClick="StartCookingAsync" Class="mb-3 start-cooking">Start cooking@(_scale.IsOne ? "" : $" {_scale.Label}")</MudButton>
     }
 
+    @* The Cook Log: "Cooked 3 times · last on 4 Nov 2026", opening to a list where a mistaken entry can be deleted. *@
+    @if (_cookLog.Count > 0)
+    {
+        var summary = new CookSummary(_cookLog.Count, _cookLog[0].Date);
+        <div class="cook-log mb-3">
+            <button type="button" class="cook-log-toggle" aria-expanded="@(_showLog ? "true" : "false")" @onclick="() => _showLog = !_showLog">
+                <MudIcon Icon="@Icons.Material.Outlined.History" Size="Size.Small" />
+                <span>@summary</span>
+                <MudIcon Icon="@(_showLog ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Size="Size.Small" />
+            </button>
+            @if (_showLog)
+            {
+                <ul class="cook-log-entries">
+                    @foreach (var entry in _cookLog)
+                    {
+                        <li @key="entry.Id">
+                            <span class="flex-grow-1">@entry.Date.ToString("ddd d MMM yyyy")</span>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small"
+                                           aria-label="@($"Delete the entry for {entry.Date:d MMM yyyy}")"
+                                           OnClick="() => DeleteCookLogEntryAsync(entry)" />
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+
     <MudText Typo="Typo.h6" HtmlTag="h2" Class="mt-2">Ingredients</MudText>
     @if (_view.Ingredients.Count == 0)
     {
@@ -196,13 +224,32 @@ else
     {
         _scale = Scale.One;
         _view = (await App.Recipes.GetRecipeAsync(RecipeId))?.AtScale(_scale);
+        _cookLog = _view is null ? [] : await App.Cooking.ListCookLogAsync(RecipeId);
         _loaded = true;
+    }
+
+    // The Recipe's Cook Log Entries, newest first, and whether the list is open.
+    private IReadOnlyList<CookLogEntry> _cookLog = [];
+    private bool _showLog;
+
+    private async Task DeleteCookLogEntryAsync(CookLogEntry entry)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Delete this entry?", $"The time you cooked this on {entry.Date:d MMM yyyy} will be removed from its history.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        await App.Cooking.DeleteCookLogEntryAsync(entry.Id);
+        _cookLog = await App.Cooking.ListCookLogAsync(RecipeId);
     }
 
     private async Task DeleteAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
-            "Delete Recipe?", $"\"{_view!.Recipe.Title}\" will be deleted.", yesText: "Delete", cancelText: "Cancel");
+            "Delete Recipe?", $"\"{_view!.Recipe.Title}\" will be deleted, with its Notes and cooking history.", yesText: "Delete", cancelText: "Cancel");
         if (confirmed != true)
         {
             return;

@@ -14,6 +14,9 @@ public sealed class CookingCatalogue
     /// <summary>Not a synced table: issue 02's sync must not list it.</summary>
     internal const string Table = "cookingSessions";
 
+    /// <summary>Cook Log Entries: a synced table, unlike Cooking Sessions.</summary>
+    internal const string CookLogTable = "cookLog";
+
     private readonly IRecordStore _store;
     private readonly IClock _clock;
 
@@ -128,6 +131,61 @@ public sealed class CookingCatalogue
     {
         var session = await RequireAsync(recipeId);
         return await SaveAsync(session with { Timers = session.Timers.Where(t => t.Id != timerId).ToList() });
+    }
+
+    /// <summary>
+    /// Done on the last Step: records a Cook Log Entry for today and ends the Cooking Session.
+    /// Works without a session too (it may have been ended on this device already).
+    /// </summary>
+    /// <exception cref="RuleViolationException">The Recipe is a Draft, or is gone.</exception>
+    public async Task<CookLogEntry> FinishAsync(string recipeId)
+    {
+        var recipe = await _store.LoadAsync<Recipe>(RecipeCatalogue.Table, recipeId);
+        if (recipe is not { Deleted: false })
+        {
+            throw new RuleViolationException("That Recipe has been deleted.");
+        }
+
+        if (recipe.IsDraft)
+        {
+            throw new RuleViolationException("Finish reviewing this Draft before cooking from it.");
+        }
+
+        var now = _clock.UtcNow;
+        var entry = new CookLogEntry { Id = Guid.NewGuid().ToString(), UpdatedAt = now, RecipeId = recipeId, Date = _clock.Today };
+        var records = new List<RecordToSave> { new(CookLogTable, entry) };
+        if (await _store.LoadAsync<CookingSession>(Table, recipeId) is { Deleted: false } session)
+        {
+            records.Add(new(Table, session with { Deleted = true, UpdatedAt = now }));
+        }
+
+        await _store.SaveAllAsync(records);
+        return entry;
+    }
+
+    /// <summary>The Recipe's Cook Log Entries, newest first.</summary>
+    public async Task<IReadOnlyList<CookLogEntry>> ListCookLogAsync(string recipeId) =>
+        (await _store.ListAsync<CookLogEntry>(CookLogTable))
+            .Where(entry => !entry.Deleted && entry.RecipeId == recipeId)
+            .OrderByDescending(entry => entry.Date)
+            .ThenByDescending(entry => entry.UpdatedAt)
+            .ToList();
+
+    /// <summary>How many times the Recipe has been cooked, and when last.</summary>
+    public async Task<CookSummary> GetCookSummaryAsync(string recipeId)
+    {
+        var log = await ListCookLogAsync(recipeId);
+        return log.Count == 0 ? CookSummary.Never : new CookSummary(log.Count, log[0].Date);
+    }
+
+    /// <summary>Deletes a mistaken Cook Log Entry, leaving a tombstone so that the deletion syncs.</summary>
+    public async Task DeleteCookLogEntryAsync(string entryId)
+    {
+        var entry = await _store.LoadAsync<CookLogEntry>(CookLogTable, entryId);
+        if (entry is { Deleted: false })
+        {
+            await _store.SaveAsync(CookLogTable, entry with { Deleted = true, UpdatedAt = _clock.UtcNow });
+        }
     }
 
     /// <summary>Ends the Cooking Session, so that cooking again starts fresh.</summary>

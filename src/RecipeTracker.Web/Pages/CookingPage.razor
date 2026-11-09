@@ -227,7 +227,7 @@
             @if (isLast)
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" EndIcon="@Icons.Material.Filled.Check"
-                           Disabled="_busy" OnClick="FinishAsync" Class="cooking-next">Finish</MudButton>
+                           Disabled="_busy" OnClick="FinishAsync" Class="cooking-next">Done</MudButton>
             }
             else
             {
@@ -451,11 +451,28 @@
         _view = _view!.AtScale(_scale);
     }
 
-    // Ends the session and returns to the recipe page. Ticket 11 adds the Cook Log Entry here.
+    // Done: records a Cook Log Entry for today, ends the session and returns to the recipe page.
     private async Task FinishAsync()
     {
-        await App.Cooking.EndAsync(RecipeId);
-        Navigation.NavigateTo($"recipes/{RecipeId}", replace: true);
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await App.Cooking.FinishAsync(RecipeId);
+            Navigation.NavigateTo($"recipes/{RecipeId}", replace: true);
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
     // ✕ keeps the session, so starting again offers Resume.

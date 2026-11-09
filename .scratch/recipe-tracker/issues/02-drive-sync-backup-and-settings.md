@@ -22,3 +22,5 @@
 - `Core/Preferences`: `Settings` (Palette, Appearance) in the **synced** `settings` table, one record with the fixed id `00000000-0000-0000-0000-000000000001`, as in Backpacking Tracker. Sync it, and give it a Sync Conflicts view if it needs one.
 - `DeviceSettings` (TextSize) in the **device-only** `deviceSettings` table: the Cook chose to have text size set per device (phone and tablet are read from different distances). Leave it out of sync and backup, like `cookingSessions`.
 - Ten food palettes (`Web/Layout/AppThemes.cs`): Paprika (default), Basil & Tomato, Saffron, Blueberry, Matcha, Espresso, Plum, Citrus, Cast Iron, Lavender & Honey. Five text sizes, including Extra large (125%). MainLayout applies them through `ThemeState`. After a sync, MainLayout should reload `Settings` and call `ThemeState.Set`, as Backpacking Tracker does.
+
+**2026-11-09 (agent, from 11):** New synced table `cookLog` (`CookingCatalogue.CookLogTable`) holds Cook Log Entries. Add it to the sync table list and to the JSON backup. Deleting a Recipe tombstones its entries, so the tombstones need to sync too.

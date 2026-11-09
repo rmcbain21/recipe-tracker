@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using RecipeTracker.Core.Books;
+using RecipeTracker.Core.Cooking;
 using RecipeTracker.Core.Ingredients;
 using RecipeTracker.Core.Organizing;
 using RecipeTracker.Core.Parsing;
@@ -157,14 +158,23 @@ public sealed partial class RecipeCatalogue
     /// </summary>
     public Task<Recipe> SaveDraftAsync(RecipeEditor editor) => SaveAsync(editor, asDraft: true);
 
-    /// <summary>Deletes the Recipe, leaving a tombstone so that the deletion syncs.</summary>
+    /// <summary>Deletes the Recipe and its Cook Log Entries, leaving tombstones so that the deletion syncs.</summary>
     public async Task DeleteRecipeAsync(string id)
     {
         var recipe = await LoadAsync(id);
-        if (recipe is not null)
+        if (recipe is null)
         {
-            await _store.SaveAsync(Table, recipe with { Deleted = true, UpdatedAt = _clock.UtcNow });
+            return;
         }
+
+        // Its Cook Log Entries go with it, as tombstones so that the deletion syncs.
+        var now = _clock.UtcNow;
+        var records = (await _store.ListAsync<CookLogEntry>(CookingCatalogue.CookLogTable))
+            .Where(entry => !entry.Deleted && entry.RecipeId == id)
+            .Select(entry => new RecordToSave(CookingCatalogue.CookLogTable, entry with { Deleted = true, UpdatedAt = now }))
+            .Append(new RecordToSave(Table, recipe with { Deleted = true, UpdatedAt = now }))
+            .ToList();
+        await _store.SaveAllAsync(records);
     }
 
     /// <summary>Adds a Note to the Recipe, or to one of its Ingredient Lines or Steps.</summary>
