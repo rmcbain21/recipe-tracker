@@ -307,3 +307,174 @@ h1:focus {
     border-color: var(--mud-palette-primary);
     border-width: 2px;
 }
+
+/* Cooking Mode: full screen over the app bar (dialogs and snackbars still show above it). */
+.cooking {
+    position: fixed;
+    inset: 0;
+    z-index: 1350;
+    display: flex;
+    flex-direction: column;
+    background: var(--mud-palette-background);
+    color: var(--mud-palette-text-primary);
+    outline: none;
+    touch-action: pan-y;
+}
+
+.cooking-top {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+    padding-top: max(0.25rem, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.cooking-title {
+    min-width: 0;
+}
+
+.cooking-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+/* Back and Next: big, side by side, at the bottom of the screen. */
+.cooking-nav {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+}
+
+.cooking-nav .mud-button-root {
+    min-height: 72px;
+    font-size: 1.15rem;
+}
+
+/* Gather: big checklist rows; ticked lines are struck through. */
+.gather-row {
+    min-height: 3.5rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.gather-row .mud-checkbox {
+    width: 100%;
+}
+
+.gather-row .mud-checkbox p,
+.gather-row .mud-checkbox .mud-typography {
+    font-size: 1.15rem;
+}
+
+.gather-row.ticked .mud-checkbox p,
+.gather-row.ticked .mud-checkbox .mud-typography {
+    text-decoration: line-through;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* One Step per screen: the current Step large, the ones either side faded. */
+.cooking-step {
+    max-width: 48rem;
+    margin: 0 auto;
+}
+
+.step-now {
+    font-size: 1.6rem;
+    line-height: 1.4;
+    margin: 0 0 1rem 0;
+    white-space: pre-line;
+}
+
+.step-label {
+    display: block;
+    color: var(--mud-palette-primary);
+}
+
+.step-faded {
+    font-size: 1rem;
+    opacity: 0.45;
+    margin: 0 0 1rem 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.step-after {
+    margin: 1.5rem 0 0 0;
+}
+
+.step-now-uses {
+    font-size: 1.2rem;
+    line-height: 1.6;
+    padding-left: 1.25rem;
+    margin: 0 0 1rem 0;
+}
+
+.step-now-notes .note-text {
+    font-size: 1.05rem;
+}
+
+/* The lines pane only shows on a tablet in landscape. */
+.cooking-lines {
+    display: none;
+}
+
+@media (min-width: 900px) and (orientation: landscape) {
+    .cooking-steps {
+        display: grid;
+        grid-template-columns: minmax(16rem, 1fr) 2fr;
+        gap: 1.5rem;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .cooking-lines {
+        display: block;
+        overflow-y: auto;
+        padding: 1rem;
+        border-right: 1px solid var(--mud-palette-lines-default);
+        font-size: 1.05rem;
+    }
+
+    .cooking-lines ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .cooking-lines li {
+        padding: 0.4rem 0.5rem;
+        border-radius: 6px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .cooking-lines li.in-step {
+        color: var(--mud-palette-text-primary);
+        font-weight: 600;
+        background: color-mix(in srgb, var(--mud-palette-primary) 14%, transparent);
+    }
+
+    .cooking-step {
+        overflow-y: auto;
+        padding: 1rem 1.5rem 1rem 0;
+        margin: 0;
+    }
+
+    .cooking-nav {
+        grid-template-columns: 1fr 1fr;
+        max-width: 40rem;
+        margin-left: auto;
+        width: 100%;
+        border-top: none;
+        background: transparent;
+    }
+}

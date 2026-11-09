@@ -1,0 +1,323 @@
+@page "/recipes/{RecipeId}/cook"
+@using RecipeTracker.Core.Cooking
+@using RecipeTracker.Core.Quantities
+@implements IAsyncDisposable
+@inject AppCore App
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_view?.Recipe.Title ?? "Cooking")</PageTitle>
+
+@* Full screen over the app bar. Gather first, then one Step per screen; Back and Next sit at the bottom, and swiping works too. *@
+<div class="cooking @(_session?.OnGather == true ? "on-gather" : "on-step")" tabindex="-1" @ref="_root"
+     @onkeydown="OnKeyDownAsync" @ontouchstart="OnTouchStart" @ontouchend="OnTouchEndAsync">
+    <header class="cooking-top">
+        <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="Exit Cooking Mode" OnClick="Exit" Class="cooking-exit" />
+        <div class="flex-grow-1 cooking-title">
+            <MudText Typo="Typo.subtitle1" Class="text-truncate">@_view?.Recipe.Title</MudText>
+            @if (_session is not null && _view is not null)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary cooking-where">
+                    @(_session.OnGather ? "Gather" : $"Step {_session.Position} of {_view.Recipe.Steps.Count}")@(_scale.IsOne ? "" : $" · {_scale.Label}")
+                </MudText>
+            }
+        </div>
+    </header>
+
+    @if (_error is not null)
+    {
+        <main class="cooking-body pa-4">
+            <MudAlert Severity="Severity.Warning">@_error</MudAlert>
+            <MudButton Href="@($"recipes/{RecipeId}")" Class="mt-2">Back to the Recipe</MudButton>
+        </main>
+    }
+    else if (_session is null || _view is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_session.OnGather)
+    {
+        <main class="cooking-body cooking-gather">
+            <MudText Typo="Typo.h5" HtmlTag="h1" Class="mb-2">Gather</MudText>
+            @if (_view.Recipe.Lines.Any(line => line.Quantity is not null))
+            {
+                <ScaleControl Yield="_view.Recipe.Yield" Value="_scale" ValueChanged="SetScaleAsync" Large="true" Class="mb-3" />
+            }
+            @if (_view.Ingredients.Count == 0)
+            {
+                <MudText Class="mud-text-secondary">Nothing to gather.</MudText>
+            }
+            @foreach (var group in _view.Ingredients)
+            {
+                @if (group.Heading is not null)
+                {
+                    <MudText Typo="Typo.subtitle1" HtmlTag="h2" Class="mt-2 ingredient-heading">@group.Heading</MudText>
+                }
+                @foreach (var line in group.Lines)
+                {
+                    var ticked = _session.GatherTicks.Contains(line.Line.Id);
+                    <div class="gather-row @(ticked ? "ticked" : "")" @key="line.Line.Id">
+                        <MudCheckBox T="bool" Value="ticked" ValueChanged="v => TickAsync(line.Line.Id, v)" Size="Size.Large"
+                                     Color="Color.Primary" Label="@line.Text" />
+                    </div>
+                }
+            }
+        </main>
+    }
+    else
+    {
+        var steps = _view.Recipe.Steps;
+        var index = _session.StepIndex!.Value;
+        var step = steps[index];
+        var uses = _view.UsesFor(step);
+        var used = uses.Select(u => u.Use.LineId).ToHashSet();
+        var notes = _view.NotesForStep(step);
+        <main class="cooking-body cooking-steps">
+            @* Tablet landscape: every line on the left, with this Step's uses highlighted. Hidden on a phone. *@
+            <aside class="cooking-lines" aria-label="Ingredients">
+                @foreach (var group in _view.Ingredients)
+                {
+                    @if (group.Heading is not null)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-2">@group.Heading</MudText>
+                    }
+                    <ul>
+                        @foreach (var line in group.Lines)
+                        {
+                            <li class="@(used.Contains(line.Line.Id) ? "in-step" : "")">@line.Text</li>
+                        }
+                    </ul>
+                }
+            </aside>
+            <section class="cooking-step">
+                @if (index > 0)
+                {
+                    <p class="step-faded step-before" @onclick="BackAsync">@steps[index - 1].Text</p>
+                }
+                <MudText Typo="Typo.overline" Class="step-label">Step @(index + 1)</MudText>
+                <p class="step-now">@step.Text</p>
+                @if (uses.Count > 0)
+                {
+                    <ul class="step-now-uses">
+                        @foreach (var use in uses)
+                        {
+                            <li>@use.Text</li>
+                        }
+                    </ul>
+                }
+                @if (notes.Count > 0)
+                {
+                    <div class="note-list mb-2 step-now-notes">
+                        @foreach (var note in notes)
+                        {
+                            <div class="note d-flex align-start gap-1">
+                                <MudIcon Icon="@Icons.Material.Outlined.StickyNote2" Size="Size.Small" Class="mt-1 note-icon" />
+                                <MudText Typo="Typo.body1" Class="note-text">
+                                    @if (note.About is not null)
+                                    {
+                                        <strong>@note.About: </strong>
+                                    }
+                                    @note.Note.Text
+                                </MudText>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (index < steps.Count - 1)
+                {
+                    <p class="step-faded step-after" @onclick="NextAsync">@steps[index + 1].Text</p>
+                }
+            </section>
+        </main>
+    }
+
+    @if (_session is not null && _view is not null && _error is null)
+    {
+        var isLast = _session.Position >= _view.Recipe.Steps.Count;
+        <footer class="cooking-nav">
+            <MudButton Variant="Variant.Outlined" Size="Size.Large" StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Disabled="_session.OnGather || _busy" OnClick="BackAsync" Class="cooking-back">Back</MudButton>
+            @if (isLast)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" EndIcon="@Icons.Material.Filled.Check"
+                           Disabled="_busy" OnClick="FinishAsync" Class="cooking-next">Finish</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" EndIcon="@Icons.Material.Filled.ArrowForward"
+                           Disabled="_busy" OnClick="NextAsync" Class="cooking-next">@(_session.OnGather ? "Start" : "Next")</MudButton>
+            }
+        </footer>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string RecipeId { get; set; } = "";
+
+    private ElementReference _root;
+    private IJSObjectReference? _wakeLock;
+    private RecipeView? _view;
+    private CookingSession? _session;
+    private Scale _scale = Scale.One;
+    private string? _error;
+    private bool _busy;
+    private (double X, double Y)? _touchStart;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var view = await App.Recipes.GetRecipeAsync(RecipeId);
+        if (view is null)
+        {
+            _error = "This Recipe has been deleted.";
+            return;
+        }
+
+        try
+        {
+            // Opening Cooking Mode directly (a bookmark, a reload) resumes, or starts at ×1.
+            _session = await App.Cooking.GetSessionAsync(RecipeId) ?? await App.Cooking.StartAsync(RecipeId, Scale.One);
+        }
+        catch (RuleViolationException ex)
+        {
+            _error = ex.Message;
+            return;
+        }
+
+        _scale = Scale.By(_session.ScaleFactor);
+        _view = view.AtScale(_scale);
+    }
+
+    // The screen last focused for the arrow keys.
+    private int? _focusedPosition;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Moving to another screen re-renders the buttons and drops focus to the page, so take it
+        // back for the arrow keys (a tablet with a keyboard). Not while typing in the Scale box.
+        if (_session is not null && _session.Position != _focusedPosition)
+        {
+            _focusedPosition = _session.Position;
+            await _root.FocusAsync(preventScroll: true);
+        }
+
+        if (firstRender)
+        {
+            try
+            {
+                _wakeLock = await JS.InvokeAsync<IJSObjectReference>("import", "./js/wakeLock.js");
+                await _wakeLock.InvokeAsync<bool>("keepAwake");
+            }
+            catch (JSException)
+            {
+                // No Wake Lock here; the screen may sleep, and everything else still works.
+            }
+        }
+    }
+
+    private async Task Change(Func<Task<CookingSession>> change)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            _session = await change();
+        }
+        catch (RuleViolationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task NextAsync() =>
+        _session is not null && _session.Position < _view!.Recipe.Steps.Count ? Change(() => App.Cooking.NextAsync(RecipeId)) : Task.CompletedTask;
+
+    private Task BackAsync() =>
+        _session is { OnGather: false } ? Change(() => App.Cooking.BackAsync(RecipeId)) : Task.CompletedTask;
+
+    private Task TickAsync(string lineId, bool ticked) => Change(() => App.Cooking.TickAsync(RecipeId, lineId, ticked));
+
+    private async Task SetScaleAsync(Scale scale)
+    {
+        await Change(() => App.Cooking.SetScaleAsync(RecipeId, scale));
+        _scale = Scale.By(_session!.ScaleFactor);
+        _view = _view!.AtScale(_scale);
+    }
+
+    // Ends the session and returns to the recipe page. Ticket 11 adds the Cook Log Entry here.
+    private async Task FinishAsync()
+    {
+        await App.Cooking.EndAsync(RecipeId);
+        Navigation.NavigateTo($"recipes/{RecipeId}", replace: true);
+    }
+
+    // ✕ keeps the session, so starting again offers Resume.
+    private void Exit() => Navigation.NavigateTo($"recipes/{RecipeId}");
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowRight" or "PageDown":
+                await NextAsync();
+                break;
+            case "ArrowLeft" or "PageUp":
+                await BackAsync();
+                break;
+            case "Escape":
+                Exit();
+                break;
+        }
+    }
+
+    private void OnTouchStart(TouchEventArgs e)
+    {
+        _touchStart = e.Touches.Length == 1 ? (e.Touches[0].ClientX, e.Touches[0].ClientY) : null;
+    }
+
+    // A mostly sideways swipe of at least 60 px: right to left is Next, left to right is Back.
+    private async Task OnTouchEndAsync(TouchEventArgs e)
+    {
+        if (_touchStart is not { } start || e.ChangedTouches.Length == 0)
+        {
+            return;
+        }
+
+        _touchStart = null;
+        var dx = e.ChangedTouches[0].ClientX - start.X;
+        var dy = e.ChangedTouches[0].ClientY - start.Y;
+        if (Math.Abs(dx) < 60 || Math.Abs(dx) < Math.Abs(dy) * 1.5)
+        {
+            return;
+        }
+
+        await (dx < 0 ? NextAsync() : BackAsync());
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_wakeLock is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _wakeLock.InvokeVoidAsync("release");
+            await _wakeLock.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The page is closing; the browser releases the lock itself.
+        }
+    }
+}

@@ -98,31 +98,13 @@ else
 
     @if (recipe.Lines.Any(line => line.Quantity is not null))
     {
-        <div class="d-flex flex-wrap align-center gap-1 mb-2 scale-control" role="group" aria-label="Scale">
-            <MudText Typo="Typo.caption" Class="mud-text-secondary mr-1">Scale</MudText>
-            @foreach (var preset in Scale.Presets)
-            {
-                var chosen = _scale == preset;
-                <MudChip T="string" Size="Size.Small" Class="ml-0 scale-preset" Color="@(chosen ? Color.Primary : Color.Default)"
-                         Variant="@(chosen ? Variant.Filled : Variant.Outlined)" aria-pressed="@(chosen ? "true" : "false")"
-                         OnClick="() => SetScale(preset)">@preset.Label</MudChip>
-            }
-            @* Any other multiplier, such as ×10 for a bulk batch. *@
-            <MudTextField T="string" Value="_customScale" ValueChanged="SetCustomScale" Placeholder="other"
-                          Adornment="Adornment.Start" AdornmentText="×" Margin="Margin.Dense" Variant="Variant.Outlined"
-                          Validation="@(new Func<string, string?>(CustomScaleError))" InputMode="@(InputMode.@decimal)"
-                          Class="@($"field-custom-scale{(_customScale.Length > 0 ? " custom-scale-on" : "")}")" aria-label="Other Scale" />
-            @if (recipe.Yield is { Amount: > 0 } yield)
-            {
-                <span class="d-inline-flex align-center gap-1 ml-1 scale-yield">
-                    <MudText Typo="Typo.body2">Make</MudText>
-                    <MudNumericField T="decimal?" Value="ScaledYieldAmount(yield)" ValueChanged="v => ScaleToYield(yield, v)"
-                                     Min="0" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Format="0.##"
-                                     Class="field-yield" aria-label="@($"Make how many {yield.Label}")" />
-                    <MudText Typo="Typo.body2">@yield.Label</MudText>
-                </span>
-            }
-        </div>
+        <ScaleControl Yield="recipe.Yield" Value="_scale" ValueChanged="SetScale" Class="mb-2" />
+    }
+
+    @if (!recipe.IsDraft && (recipe.Steps.Count > 0 || recipe.Lines.Count > 0))
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SoupKitchen"
+                   OnClick="StartCookingAsync" Class="mb-3 start-cooking">Start cooking@(_scale.IsOne ? "" : $" {_scale.Label}")</MudButton>
     }
 
     <MudText Typo="Typo.h6" HtmlTag="h2" Class="mt-2">Ingredients</MudText>
@@ -170,50 +152,49 @@ else
     // The Scale is only for this visit to the page: it's never saved, and opening the page resets it.
     private Scale _scale = Scale.One;
 
-    // What the "other" box shows: blank on a preset, otherwise the Scale in use (typed, or from "Make N").
-    private string _customScale = "";
-
     private void SetScale(Scale scale)
     {
         _scale = scale;
         _view = _view!.AtScale(scale);
-        _customScale = Scale.Presets.Contains(scale) ? "" : scale.Label.TrimStart('×');
     }
 
-    private void SetCustomScale(string? text)
+    // Opens Cooking Mode at the page's Scale. If this device has a session for the Recipe, asks
+    // whether to resume it (at its own place and Scale) or start over.
+    private async Task StartCookingAsync()
     {
-        if (string.IsNullOrWhiteSpace(text))
+        if (await App.Cooking.GetSessionAsync(RecipeId) is { } session)
         {
-            SetScale(Scale.One);
+            var where = session.OnGather ? "Gather" : $"Step {session.Position}";
+            var choice = await DialogService.ShowMessageBoxAsync(
+                "Resume cooking?", $"You were on {where}.", yesText: "Resume", noText: "Start over", cancelText: "Cancel");
+            if (choice is null)
+            {
+                return;
+            }
+
+            if (choice == true)
+            {
+                Navigation.NavigateTo($"recipes/{RecipeId}/cook");
+                return;
+            }
         }
-        else if (Scale.TryParse(text, out var scale))
+
+        try
         {
-            SetScale(scale!);
+            await App.Cooking.StartAsync(RecipeId, _scale);
+            Navigation.NavigateTo($"recipes/{RecipeId}/cook");
         }
-        else
+        catch (RuleViolationException ex)
         {
-            _customScale = text; // keep what was typed so the error shows against it
+            Snackbar.Add(ex.Message, Severity.Warning);
         }
     }
 
-    private static string? CustomScaleError(string? text) =>
-        string.IsNullOrWhiteSpace(text) || Scale.TryParse(text, out _) ? null : $"Try 4 or 2½ (up to ×{Scale.MaxFactor:0})";
-
-    private decimal? ScaledYieldAmount(Yield yield) => Math.Round(yield.Amount!.Value * _scale.Factor, 2);
-
-    private void ScaleToYield(Yield yield, decimal? target)
-    {
-        if (target is > 0)
-        {
-            SetScale(Scale.ToYield(yield, target.Value));
-        }
-    }
     private bool _loaded;
 
     protected override async Task OnParametersSetAsync()
     {
         _scale = Scale.One;
-        _customScale = "";
         _view = (await App.Recipes.GetRecipeAsync(RecipeId))?.AtScale(_scale);
         _loaded = true;
     }

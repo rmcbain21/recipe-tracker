@@ -1,0 +1,82 @@
+@* Picks a Scale: the ×½–×3 presets, any other multiplier (such as ×10 for a bulk batch), or "Make N" of the Recipe's Yield when it has a number. Used on the recipe page and on Gather. *@
+@using RecipeTracker.Core.Quantities
+
+<div class="d-flex flex-wrap align-center gap-1 scale-control @Class" role="group" aria-label="Scale">
+    <MudText Typo="Typo.caption" Class="mud-text-secondary mr-1">Scale</MudText>
+    @foreach (var preset in Scale.Presets)
+    {
+        var chosen = Value == preset;
+        <MudChip T="string" Size="@ChipSize" Class="ml-0 scale-preset" Color="@(chosen ? Color.Primary : Color.Default)"
+                 Variant="@(chosen ? Variant.Filled : Variant.Outlined)" aria-pressed="@(chosen ? "true" : "false")"
+                 OnClick="() => ChooseAsync(preset)">@preset.Label</MudChip>
+    }
+    <MudTextField T="string" Value="CustomText" ValueChanged="SetCustomAsync" Placeholder="other"
+                  Adornment="Adornment.Start" AdornmentText="×" Margin="Margin.Dense" Variant="Variant.Outlined"
+                  Validation="@(new Func<string, string?>(CustomError))" InputMode="@(InputMode.@decimal)"
+                  Class="@($"field-custom-scale{(CustomText.Length > 0 ? " custom-scale-on" : "")}")" aria-label="Other Scale" />
+    @if (Yield is { Amount: > 0 } yield)
+    {
+        <span class="d-inline-flex align-center gap-1 ml-1 scale-yield">
+            <MudText Typo="Typo.body2">Make</MudText>
+            <MudNumericField T="decimal?" Value="Math.Round(yield.Amount.Value * Value.Factor, 2)" ValueChanged="v => ToYieldAsync(yield, v)"
+                             Min="0" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Format="0.##"
+                             Class="field-yield" aria-label="@($"Make how many {yield.Label}")" />
+            <MudText Typo="Typo.body2">@yield.Label</MudText>
+        </span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Scale Value { get; set; } = Scale.One;
+
+    [Parameter]
+    public EventCallback<Scale> ValueChanged { get; set; }
+
+    /// <summary>The Recipe's Yield; "Make N" shows when it has a number.</summary>
+    [Parameter]
+    public Yield? Yield { get; set; }
+
+    /// <summary>Bigger chips, for Cooking Mode.</summary>
+    [Parameter]
+    public bool Large { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    // Text typed in "other" that isn't a Scale, kept so its error shows against it.
+    private string? _invalid;
+
+    private Size ChipSize => Large ? Size.Large : Size.Small;
+
+    // Blank on a preset, otherwise the Scale in use (typed, or from "Make N").
+    private string CustomText => _invalid ?? (Scale.Presets.Contains(Value) ? "" : Value.Label.TrimStart('×'));
+
+    private Task ChooseAsync(Scale scale)
+    {
+        _invalid = null;
+        return ValueChanged.InvokeAsync(scale);
+    }
+
+    private Task SetCustomAsync(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return ChooseAsync(Scale.One);
+        }
+
+        if (Scale.TryParse(text, out var scale))
+        {
+            return ChooseAsync(scale!);
+        }
+
+        _invalid = text;
+        return Task.CompletedTask;
+    }
+
+    private Task ToYieldAsync(Yield yield, decimal? target) =>
+        target is > 0 ? ChooseAsync(Scale.ToYield(yield, target.Value)) : Task.CompletedTask;
+
+    private static string? CustomError(string? text) =>
+        string.IsNullOrWhiteSpace(text) || Scale.TryParse(text, out _) ? null : $"Try 4 or 2½ (up to ×{Scale.MaxFactor:0})";
+}

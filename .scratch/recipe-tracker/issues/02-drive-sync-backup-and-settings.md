@@ -14,3 +14,5 @@
 - [ ] Appearance and Text size sync through the Settings record (fixed id), and the top bar has a Settings icon.
 
 ## Comments
+
+**2026-11-08 (agent, from 09):** Cooking Sessions are stored in the same record store, in the `cookingSessions` table (`CookingCatalogue.Table`). The spec says they're device-local and never synced, so don't add that table to the sync engine's table list (`RecordTable.All` in Backpacking Tracker) or to the JSON backup. Tables to sync so far: `recipes`, `ingredients`, `books`, `tags`, `tagGroups`. The Settings page also exists already in a minimal form (`Pages/SettingsPage.razor`, linking Books and Tags), so build on it.

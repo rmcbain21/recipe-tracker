@@ -88,6 +88,15 @@ public sealed class RecipeView
     public IReadOnlyList<Note> NotesFor(string? targetId) =>
         Recipe.Notes.Where(note => note.TargetId == targetId).Reverse().ToList();
 
+    /// <summary>
+    /// The Notes Cooking Mode shows with a Step: the Step's own, then those on the Ingredient Lines
+    /// it uses, each newest first. <see cref="StepNote.About"/> names the line, or is null for the Step.
+    /// </summary>
+    public IReadOnlyList<StepNote> NotesForStep(Step step) =>
+        NotesFor(step.Id).Select(note => new StepNote(null, note))
+            .Concat(UsesFor(step).SelectMany(use => NotesFor(use.Use.LineId).Select(note => new StepNote(use.Line.IngredientName, note))))
+            .ToList();
+
     /// <summary>The Source as shown after "From", or null if the Recipe has none.</summary>
     public ShownSource? Source { get; }
 
@@ -136,6 +145,9 @@ public sealed class RecipeView
 
 /// <summary>An Ingredient Section's heading (null for the lines before the first one) and its lines.</summary>
 public sealed record IngredientGroup(string? Heading, IReadOnlyList<ShownLine> Lines);
+
+/// <summary>A Note shown with a Step in Cooking Mode, and the Ingredient it's about (null for a Note on the Step itself).</summary>
+public sealed record StepNote(string? About, Note Note);
 
 /// <summary>A Step's Ingredient Use with its line and the use written out, such as "sugar, ½ cup (of 1 cup)".</summary>
 public sealed record ShownUse(IngredientUse Use, ShownLine Line, string Text);
