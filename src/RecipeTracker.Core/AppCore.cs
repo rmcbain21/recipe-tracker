@@ -4,6 +4,7 @@ using RecipeTracker.Core.Ingredients;
 using RecipeTracker.Core.Organizing;
 using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Ports;
+using RecipeTracker.Core.Preferences;
 using RecipeTracker.Core.Recipes;
 
 namespace RecipeTracker.Core;
@@ -21,11 +22,14 @@ public sealed class AppCore
         Books = new BookCatalogue(store, clock);
         Tags = new TagCatalogue(store, clock);
         Cooking = new CookingCatalogue(store, clock);
+        Settings = new UserSettings(store, clock);
     }
 
     public TagCatalogue Tags { get; }
 
     public CookingCatalogue Cooking { get; }
+
+    public UserSettings Settings { get; }
 
     public BookCatalogue Books { get; }
 

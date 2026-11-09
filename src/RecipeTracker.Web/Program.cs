@@ -15,5 +15,6 @@ builder.Services.AddMudServices();
 builder.Services.AddSingleton<IRecordStore, DexieRecordStore>();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<AppCore>();
+builder.Services.AddSingleton<RecipeTracker.Web.Layout.ThemeState>();
 
 await builder.Build().RunAsync();

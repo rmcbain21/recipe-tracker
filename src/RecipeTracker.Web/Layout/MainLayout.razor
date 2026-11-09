@@ -1,12 +1,16 @@
 @inherits LayoutComponentBase
+@using RecipeTracker.Core.Preferences
+@implements IDisposable
 @inject IJSRuntime JS
+@inject AppCore App
+@inject ThemeState Theme
 
-<MudThemeProvider @ref="_themeProvider" Theme="AppTheme.Theme" IsDarkMode="_deviceIsDark" />
+<MudThemeProvider @ref="_themeProvider" Theme="AppThemes.For(Theme.Palette).Theme" IsDarkMode="IsDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<CascadingValue Value="_deviceIsDark" Name="IsDarkMode">
+<CascadingValue Value="IsDarkMode" Name="IsDarkMode">
     <MudLayout>
         <MudAppBar Elevation="1" Dense="true">
             <MudText Typo="Typo.h6">Recipe Tracker</MudText>
@@ -50,12 +54,28 @@
     private MudThemeProvider _themeProvider = default!;
     private bool _deviceIsDark;
     private string? _statusBarColour;
+    private string? _rootFontSize;
+
+    private bool IsDarkMode => Theme.Appearance switch
+    {
+        Appearance.Dark => true,
+        Appearance.Light => false,
+        _ => _deviceIsDark,
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Theme.Changed += OnThemeChanged;
+        var settings = await App.Settings.GetAsync();
+        var device = await App.Settings.GetDeviceAsync();
+        Theme.Set(settings.Palette, settings.Appearance, device.TextSize);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Match the device's dark mode, and follow it if it changes while the app is open.
+            // Match my device: read the device's dark mode, and follow it if it changes while the app is open.
             _deviceIsDark = await _themeProvider.GetSystemDarkModeAsync();
             await _themeProvider.WatchSystemDarkModeAsync(isDark =>
             {
@@ -66,12 +86,23 @@
         }
 
         // The phone's status bar takes the top bar's colour.
-        var theme = AppTheme.Theme;
-        var barColour = (_deviceIsDark ? theme.PaletteDark.AppbarBackground : theme.PaletteLight.AppbarBackground).ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
+        var theme = AppThemes.For(Theme.Palette).Theme;
+        var barColour = (IsDarkMode ? theme.PaletteDark.AppbarBackground : theme.PaletteLight.AppbarBackground).ToString(MudBlazor.Utilities.MudColorOutputFormats.Hex);
         if (barColour != _statusBarColour)
         {
             _statusBarColour = barColour;
             await JS.InvokeVoidAsync("setThemeColor", barColour);
         }
+
+        var fontSize = ThemeState.RootFontSize(Theme.TextSize);
+        if (fontSize != _rootFontSize)
+        {
+            _rootFontSize = fontSize;
+            await JS.InvokeVoidAsync("setRootFontSize", fontSize);
+        }
     }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Theme.Changed -= OnThemeChanged;
 }

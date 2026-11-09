@@ -1,12 +1,59 @@
 @page "/settings"
+@using RecipeTracker.Core.Preferences
+@inject AppCore App
+@inject ThemeState Theme
 
-@* For now only links to the Books and Tags pages. Sync, backup, Appearance and Text size arrive with issue 02, and Ingredients with issue 13. *@
+@* Colours, appearance and text size, and links to Books and Tags. Sync and backup arrive with issue 02, and Ingredients with issue 13. *@
 
 <PageTitle>Settings</PageTitle>
 
 <MudText Typo="Typo.h5" HtmlTag="h1" Class="mb-4">Settings</MudText>
 
-<MudPaper>
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.subtitle1" HtmlTag="h2">Colours</MudText>
+    <div class="palette-choices mt-2" role="radiogroup" aria-label="Colour palette">
+        @foreach (var option in AppThemes.All)
+        {
+            // Each swatch shows the palette's own colours, in light or dark as the app is now.
+            var colours = IsDark ? Swatch(option.Theme.PaletteDark) : Swatch(option.Theme.PaletteLight);
+            var chosen = option.Palette == Theme.Palette;
+            <button type="button" role="radio" aria-checked="@(chosen ? "true" : "false")"
+                    class="@($"palette-choice{(chosen ? " chosen" : "")}")" @onclick="() => SetPaletteAsync(option.Palette)">
+                <span class="palette-swatch" style="@($"background:{colours.Background}")">
+                    <span style="@($"background:{colours.Main}")"></span>
+                    <span style="@($"background:{colours.Accent}")"></span>
+                </span>
+                <span class="palette-name">@option.Name</span>
+            </button>
+        }
+    </div>
+
+    <MudText Typo="Typo.subtitle2" HtmlTag="h3" Class="mt-4">Appearance</MudText>
+    <div class="stacked-radios">
+        <MudRadioGroup T="Appearance" Value="Theme.Appearance" ValueChanged="SetAppearanceAsync">
+            <MudRadio Value="Appearance.MatchDevice" Color="Color.Primary">Match my device</MudRadio>
+            <MudRadio Value="Appearance.Light" Color="Color.Primary">Light</MudRadio>
+            <MudRadio Value="Appearance.Dark" Color="Color.Primary">Dark</MudRadio>
+        </MudRadioGroup>
+    </div>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">Colours and appearance follow you to your other devices.</MudText>
+</MudPaper>
+
+<MudPaper Class="pa-4 mt-4">
+    <MudText Typo="Typo.subtitle1" HtmlTag="h2">Text size</MudText>
+    <div class="stacked-radios">
+        <MudRadioGroup T="TextSize" Value="Theme.TextSize" ValueChanged="SetTextSizeAsync">
+            <MudRadio Value="TextSize.ExtraSmall" Color="Color.Primary">Extra small</MudRadio>
+            <MudRadio Value="TextSize.Small" Color="Color.Primary">Small</MudRadio>
+            <MudRadio Value="TextSize.Default" Color="Color.Primary">Default</MudRadio>
+            <MudRadio Value="TextSize.Large" Color="Color.Primary">Large</MudRadio>
+            <MudRadio Value="TextSize.ExtraLarge" Color="Color.Primary">Extra large</MudRadio>
+        </MudRadioGroup>
+    </div>
+    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">Just for this device, so your phone and tablet can differ.</MudText>
+</MudPaper>
+
+<MudPaper Class="mt-4">
     <MudList T="string">
         <MudListItem T="string" Href="books" Icon="@Icons.Material.Filled.LibraryBooks">
             <MudText Typo="Typo.body1">Books</MudText>
@@ -18,3 +65,30 @@
         </MudListItem>
     </MudList>
 </MudPaper>
+
+@code {
+    // Whether the app is showing dark colours now, from MainLayout.
+    [CascadingParameter(Name = "IsDarkMode")]
+    private bool IsDark { get; set; }
+
+    private async Task SetPaletteAsync(ColourPalette palette)
+    {
+        await App.Settings.SetPaletteAsync(palette);
+        Theme.Set(palette, Theme.Appearance, Theme.TextSize);
+    }
+
+    private async Task SetAppearanceAsync(Appearance appearance)
+    {
+        await App.Settings.SetAppearanceAsync(appearance);
+        Theme.Set(Theme.Palette, appearance, Theme.TextSize);
+    }
+
+    private async Task SetTextSizeAsync(TextSize textSize)
+    {
+        await App.Settings.SetTextSizeAsync(textSize);
+        Theme.Set(Theme.Palette, Theme.Appearance, textSize);
+    }
+
+    private static (string Background, string Main, string Accent) Swatch(Palette palette) =>
+        (palette.Background.Value, palette.Primary.Value, palette.Secondary.Value);
+}

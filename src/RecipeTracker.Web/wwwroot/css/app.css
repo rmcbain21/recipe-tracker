@@ -538,3 +538,53 @@ h1:focus {
         background: transparent;
     }
 }
+
+/* Settings: the colour palette picker, one swatch per palette. */
+.palette-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+}
+
+.palette-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border: 2px solid var(--mud-palette-divider);
+    border-radius: 8px;
+    background: none;
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+.palette-choice.chosen {
+    border-color: var(--mud-palette-primary);
+}
+
+.palette-swatch {
+    display: flex;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--mud-palette-divider);
+}
+
+.palette-swatch span {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+}
+
+.palette-name {
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+/* A radio group with one choice per line, however short the labels (outranks MudBlazor's row layout). */
+.stacked-radios .mud-input-control.mud-input-control-boolean-input .mud-radio-group {
+    flex-direction: column;
+    align-items: flex-start;
+}
