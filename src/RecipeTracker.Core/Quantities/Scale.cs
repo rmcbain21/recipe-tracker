@@ -26,6 +26,26 @@ public sealed record Scale
     public static Scale By(decimal factor) =>
         factor > 0 ? new(factor) : throw new ArgumentOutOfRangeException(nameof(factor), "A Scale must be more than zero.");
 
+    /// <summary>The largest custom Scale, so a slip of the thumb ("×1000") doesn't produce nonsense.</summary>
+    public const decimal MaxFactor = 100;
+
+    /// <summary>
+    /// Reads a custom Scale typed by the Cook: "4", "×4", "x4", "2½", "2 1/2" or "1.25". A blank,
+    /// zero, a range, or anything over <see cref="MaxFactor"/> isn't one.
+    /// </summary>
+    public static bool TryParse(string? text, out Scale? scale)
+    {
+        scale = null;
+        var trimmed = (text ?? "").Trim().TrimStart('×', 'x', 'X').Trim();
+        if (trimmed.Length == 0 || !Quantity.TryParse(trimmed, out var quantity) || quantity is not { IsRange: false } || quantity.Low > MaxFactor)
+        {
+            return false;
+        }
+
+        scale = new(quantity.Low);
+        return true;
+    }
+
     /// <summary>The Scale that makes <paramref name="target"/> of what the Yield counts ("6 servings" from 4).</summary>
     /// <exception cref="RuleViolationException">The Yield has no number, or the target isn't more than zero.</exception>
     public static Scale ToYield(Yield? yield, decimal target)

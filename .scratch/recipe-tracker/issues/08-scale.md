@@ -22,3 +22,5 @@
 Checked in a headless browser at phone width: ×2, Make 6 and Make 5 scaled the lines, the Step uses and the Yield as expected, and leaving and reopening the page reset it to ×1. No console errors.
 
 Not done: the third box, passing the Scale to Cooking Mode, needs ticket 09. Possible follow-ups seen while checking: units stay as written, so ×2 shows "2 cup sugar", and counted items can scale to fractions ("2½–3¾ eggs").
+
+**2026-11-08 (agent):** Added a custom Scale at the Cook's request, for bulk batches. After the presets there's a "× other" box that takes any multiplier: "4", "×10", "2½", "2 1/2" or "1.25", up to ×100 (`Scale.TryParse`, `Scale.MaxFactor`). Anything else shows "Try 4 or 2½ (up to ×100)" and leaves the Scale as it was. Clearing the box goes back to ×1. The box is outlined while it's the Scale in use. It shows the factor when "Make N" picks one that isn't a preset (Make 100 from 4 shows 25), and it's cleared by tapping a preset. 281 core tests pass (13 new). Checked in a headless browser: ×10 gave "40 servings (×10)", "10 cup sugar" and "20–30 eggs"; bad input was refused; a preset cleared the box; and Make 100 filled in 25.

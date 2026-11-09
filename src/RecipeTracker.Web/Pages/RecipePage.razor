@@ -107,6 +107,11 @@ else
                          Variant="@(chosen ? Variant.Filled : Variant.Outlined)" aria-pressed="@(chosen ? "true" : "false")"
                          OnClick="() => SetScale(preset)">@preset.Label</MudChip>
             }
+            @* Any other multiplier, such as ×10 for a bulk batch. *@
+            <MudTextField T="string" Value="_customScale" ValueChanged="SetCustomScale" Placeholder="other"
+                          Adornment="Adornment.Start" AdornmentText="×" Margin="Margin.Dense" Variant="Variant.Outlined"
+                          Validation="@(new Func<string, string?>(CustomScaleError))" InputMode="@(InputMode.@decimal)"
+                          Class="@($"field-custom-scale{(_customScale.Length > 0 ? " custom-scale-on" : "")}")" aria-label="Other Scale" />
             @if (recipe.Yield is { Amount: > 0 } yield)
             {
                 <span class="d-inline-flex align-center gap-1 ml-1 scale-yield">
@@ -165,11 +170,34 @@ else
     // The Scale is only for this visit to the page: it's never saved, and opening the page resets it.
     private Scale _scale = Scale.One;
 
+    // What the "other" box shows: blank on a preset, otherwise the Scale in use (typed, or from "Make N").
+    private string _customScale = "";
+
     private void SetScale(Scale scale)
     {
         _scale = scale;
         _view = _view!.AtScale(scale);
+        _customScale = Scale.Presets.Contains(scale) ? "" : scale.Label.TrimStart('×');
     }
+
+    private void SetCustomScale(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            SetScale(Scale.One);
+        }
+        else if (Scale.TryParse(text, out var scale))
+        {
+            SetScale(scale!);
+        }
+        else
+        {
+            _customScale = text; // keep what was typed so the error shows against it
+        }
+    }
+
+    private static string? CustomScaleError(string? text) =>
+        string.IsNullOrWhiteSpace(text) || Scale.TryParse(text, out _) ? null : $"Try 4 or 2½ (up to ×{Scale.MaxFactor:0})";
 
     private decimal? ScaledYieldAmount(Yield yield) => Math.Round(yield.Amount!.Value * _scale.Factor, 2);
 
@@ -185,6 +213,7 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _scale = Scale.One;
+        _customScale = "";
         _view = (await App.Recipes.GetRecipeAsync(RecipeId))?.AtScale(_scale);
         _loaded = true;
     }

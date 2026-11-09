@@ -291,3 +291,19 @@ h1:focus {
 .field-yield .mud-input-control {
     margin-top: 0;
 }
+
+/* The Scale control's "× other" box: small, and outlined in the primary colour while it's the Scale in use. */
+.field-custom-scale {
+    width: 5.5rem;
+    flex: 0 0 5.5rem;
+}
+
+.field-custom-scale .mud-input-control,
+.field-custom-scale.mud-input-control {
+    margin-top: 0;
+}
+
+.custom-scale-on .mud-input-outlined-border {
+    border-color: var(--mud-palette-primary);
+    border-width: 2px;
+}

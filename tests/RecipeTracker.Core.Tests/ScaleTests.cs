@@ -66,6 +66,41 @@ public class ScaleTests
         Assert.Throws<RuleViolationException>(() => Scale.ToYield(new Yield(4, "servings"), 0));
     }
 
+    [Theory]
+    [InlineData("4", 4)]
+    [InlineData("×10", 10)]
+    [InlineData(" x 2½ ", 2.5)]
+    [InlineData("X1 1/2", 1.5)]
+    [InlineData("1.25", 1.25)]
+    [InlineData("100", 100)]
+    public void A_custom_scale_is_read_from_what_the_cook_types(string text, double factor)
+    {
+        Assert.True(Scale.TryParse(text, out var scale));
+        Assert.Equal((decimal)factor, scale!.Factor);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("×")]
+    [InlineData("0")]
+    [InlineData("2-3")]
+    [InlineData("lots")]
+    [InlineData("101")]
+    public void Things_that_are_not_a_custom_scale_are_refused(string text)
+    {
+        Assert.False(Scale.TryParse(text, out _));
+    }
+
+    [Fact]
+    public void A_bulk_scale_multiplies_large_amounts()
+    {
+        Assert.True(Scale.TryParse("12", out var scale));
+        Assert.True(Quantity.TryParse("2-3", out var eggs));
+
+        Assert.Equal("24–36", scale!.Format(eggs!));
+        Assert.Equal("48 servings (×12)", scale.Format(new Yield(4, "servings")));
+    }
+
     [Fact]
     public void Labels_show_the_factor()
     {
