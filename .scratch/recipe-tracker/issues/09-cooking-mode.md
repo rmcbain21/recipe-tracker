@@ -26,3 +26,11 @@
 Checked in a headless browser: at phone size, started at ×2 from the page; Gather showed "2 cup sugar", "4 eggs", "⅔ cup cocoa"; the Wake Lock was held; a tick stuck; Step 1 showed its uses and both Notes; Back and Next were 72 px tall at y 816 of 900; swipe left and right and ArrowRight moved; Exit then Resume came back to Step 2 with the tick kept; Start over cleared it; Finish ended the session; a Draft had no Start cooking and its `/cook` was refused. At 1280×800 the two-pane layout showed with "⅔ cup cocoa" highlighted on Step 2. No console errors.
 
 Still to check by hand: on the phone (swipe with a real finger, and the screen staying on with the phone untouched) and on the tablet in landscape.
+
+**2026-11-08 (agent):** Changes from the Cook's first look:
+
+1. "The ingredients aren't updating each step." Likely cause: Recipes saved before ticket 06 have no Ingredient Uses on their Steps, so nothing per-Step showed and nothing was highlighted. Now, when no Step of a Recipe has any saved uses, `RecipeView.UsesFor` shows the uses suggested from each Step's text (`UsesAreSuggested`), on the recipe page and in Cooking Mode. They aren't saved; opening the Recipe in the editor and saving it keeps them as real uses. Once any Step has a saved use, nothing is suggested on the page.
+2. The ingredients pane now has a toggle: **This step** (the default; the Step's ingredients with their amounts at the Scale, changing with every Step) or **All** (every line, with this Step's highlighted). In landscape it's the left column, and the uses list under the Step text is hidden there, since the pane shows it.
+3. In portrait the same pane is a collapsible **Ingredients** card above the Step ("2 in this step" or "showing all" when collapsed). Whether it's open, and the mode, carry from Step to Step.
+
+293 core tests pass (2 new). Checked in a headless browser at 412×900 and 1280×800, using a Recipe whose uses were stripped in IndexedDB to look like an old one. The card and toggle updated with each Step, and the selected toggle button shows filled. No console errors.

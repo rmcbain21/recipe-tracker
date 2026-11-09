@@ -1,6 +1,7 @@
 using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
 using RecipeTracker.Core.Organizing;
+using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Quantities;
 
 namespace RecipeTracker.Core.Recipes;
@@ -55,7 +56,7 @@ public sealed class RecipeView
     public IReadOnlyList<ShownUse> UsesFor(Step step)
     {
         var lines = Ingredients.SelectMany(group => group.Lines).ToDictionary(shown => shown.Line.Id);
-        return step.Uses
+        return UsesOf(step)
             .Where(use => !use.Unticked && lines.ContainsKey(use.LineId))
             .Select(use =>
             {
@@ -67,6 +68,46 @@ public sealed class RecipeView
                 return new ShownUse(use, shown, text);
             })
             .ToList();
+    }
+
+    /// <summary>
+    /// True when no Step has any Ingredient Uses saved (a Recipe saved before they existed, or never
+    /// reviewed for them), so <see cref="UsesFor"/> shows the uses suggested from each Step's text.
+    /// Opening the Recipe in the editor and saving it keeps them.
+    /// </summary>
+    public bool UsesAreSuggested => Recipe.Lines.Count > 0 && Recipe.Steps.Count > 0 && Recipe.Steps.All(step => step.Uses.Count == 0);
+
+    private IReadOnlyDictionary<string, IReadOnlyList<IngredientUse>>? _suggestedUses;
+
+    private IReadOnlyList<IngredientUse> UsesOf(Step step)
+    {
+        if (!UsesAreSuggested)
+        {
+            return step.Uses;
+        }
+
+        _suggestedUses ??= SuggestUses();
+        return _suggestedUses.GetValueOrDefault(step.Id) ?? [];
+    }
+
+    private Dictionary<string, IReadOnlyList<IngredientUse>> SuggestUses()
+    {
+        var candidates = Recipe.Lines.Select(line => new UseCandidate(line.Id, NamesOf(line))).ToList();
+        return Recipe.Steps.ToDictionary(
+            step => step.Id,
+            step => (IReadOnlyList<IngredientUse>)IngredientUseSuggester.Suggest(step.Text, candidates).Select(id => new IngredientUse(id)).ToList());
+    }
+
+    private IReadOnlyList<string> NamesOf(IngredientLine line)
+    {
+        var names = new List<string> { line.SuggestedName };
+        if (line.IngredientId is not null && _ingredients.TryGetValue(line.IngredientId, out var ingredient))
+        {
+            names.Add(ingredient.Name);
+            names.AddRange(ingredient.Aliases);
+        }
+
+        return names.Where(name => name.Length > 0).ToList();
     }
 
     // "Pinch" was capitalised at the start of "Pinch of salt"; after "salt, " it reads as "pinch".

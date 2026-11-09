@@ -169,6 +169,37 @@ public class IngredientUseTests
     }
 
     [Fact]
+    public async Task A_recipe_saved_before_ingredient_uses_shows_them_suggested_from_the_step_text()
+    {
+        var app = CreateApp();
+        var recipe = await app.Recipes.SaveAsync(await CaptureAsync(app));
+        await _store.SaveAsync("recipes", recipe with { Steps = recipe.Steps.Select(s => s with { Uses = [] }).ToList() });
+
+        var view = (await app.Recipes.GetRecipeAsync(recipe.Id))!;
+
+        Assert.True(view.UsesAreSuggested);
+        Assert.Equal(["sugar, 1 cup", "butter, 2 tbsp"], view.UsesFor(view.Recipe.Steps[0]).Select(u => u.Text));
+        Assert.Equal(["sugar, 2 cup", "butter, 4 tbsp"], view.AtScale(Quantities.Scale.By(2)).UsesFor(view.Recipe.Steps[0]).Select(u => u.Text));
+    }
+
+    [Fact]
+    public async Task Once_any_step_has_saved_uses_nothing_is_suggested_on_the_page()
+    {
+        var app = CreateApp();
+        var editor = await CaptureAsync(app);
+        foreach (var use in editor.Steps.Skip(1).SelectMany(s => s.Uses))
+        {
+            use.Ticked = false;
+        }
+
+        var recipe = await app.Recipes.SaveAsync(editor);
+        var view = (await app.Recipes.GetRecipeAsync(recipe.Id))!;
+
+        Assert.False(view.UsesAreSuggested);
+        Assert.Empty(view.UsesFor(view.Recipe.Steps[1]));
+    }
+
+    [Fact]
     public async Task A_use_of_a_line_with_no_amount_shows_just_its_name()
     {
         var app = CreateApp();

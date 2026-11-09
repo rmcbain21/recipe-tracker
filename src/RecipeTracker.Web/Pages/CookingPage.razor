@@ -74,21 +74,54 @@
         var used = uses.Select(u => u.Use.LineId).ToHashSet();
         var notes = _view.NotesForStep(step);
         <main class="cooking-body cooking-steps">
-            @* Tablet landscape: every line on the left, with this Step's uses highlighted. Hidden on a phone. *@
-            <aside class="cooking-lines" aria-label="Ingredients">
-                @foreach (var group in _view.Ingredients)
-                {
-                    @if (group.Heading is not null)
+            @* The ingredients pane: on the left on a tablet in landscape; a collapsible section above
+               the Step in portrait. "This step" lists the Step's ingredients and amounts, and "All"
+               lists every line with the Step's highlighted. *@
+            <aside class="cooking-lines @(_paneOpen ? "open" : "")" aria-label="Ingredients">
+                <button type="button" class="pane-toggle" aria-expanded="@(_paneOpen ? "true" : "false")"
+                        @onclick="() => _paneOpen = !_paneOpen">
+                    <MudIcon Icon="@Icons.Material.Filled.Kitchen" Size="Size.Small" />
+                    <span class="flex-grow-1">Ingredients</span>
+                    <span class="mud-text-secondary pane-count">@(_showAll ? "showing all" : $"{uses.Count} in this step")</span>
+                    <MudIcon Icon="@(_paneOpen ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Size="Size.Small" />
+                </button>
+                <div class="pane-content">
+                    <MudButtonGroup Size="Size.Small" Color="Color.Primary" OverrideStyles="false" Class="mb-2 pane-mode">
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_showAll ? Variant.Outlined : Variant.Filled)" OnClick="() => _showAll = false"
+                                   aria-pressed="@(_showAll ? "false" : "true")">This step</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="@(_showAll ? Variant.Filled : Variant.Outlined)" OnClick="() => _showAll = true"
+                                   aria-pressed="@(_showAll ? "true" : "false")">All</MudButton>
+                    </MudButtonGroup>
+                    @if (!_showAll)
                     {
-                        <MudText Typo="Typo.subtitle2" Class="mt-2">@group.Heading</MudText>
-                    }
-                    <ul>
-                        @foreach (var line in group.Lines)
+                        @if (uses.Count == 0)
                         {
-                            <li class="@(used.Contains(line.Line.Id) ? "in-step" : "")">@line.Text</li>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary pa-1">No ingredients in this step.</MudText>
                         }
-                    </ul>
-                }
+                        <ul class="pane-step">
+                            @foreach (var use in uses)
+                            {
+                                <li class="in-step">@use.Text</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        @foreach (var group in _view.Ingredients)
+                        {
+                            @if (group.Heading is not null)
+                            {
+                                <MudText Typo="Typo.subtitle2" Class="mt-2">@group.Heading</MudText>
+                            }
+                            <ul class="pane-all">
+                                @foreach (var line in group.Lines)
+                                {
+                                    <li class="@(used.Contains(line.Line.Id) ? "in-step" : "")">@line.Text</li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
             </aside>
             <section class="cooking-step">
                 @if (index > 0)
@@ -163,6 +196,11 @@
     private Scale _scale = Scale.One;
     private string? _error;
     private bool _busy;
+
+    // The ingredients pane: "All" or "This step", and whether it's open in portrait. Both last while
+    // the page is open, so they carry from Step to Step.
+    private bool _showAll;
+    private bool _paneOpen;
     private (double X, double Y)? _touchStart;
 
     protected override async Task OnParametersSetAsync()
