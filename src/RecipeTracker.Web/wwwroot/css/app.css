@@ -392,6 +392,92 @@ h1:focus {
     white-space: pre-line;
 }
 
+/* A time in the Step's text, as a chip that starts a timer. */
+.timer-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0 0.1rem;
+    padding: 0 0.6rem;
+    border: 2px solid var(--mud-palette-primary);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--mud-palette-primary);
+    font: inherit;
+    line-height: 1.3;
+    vertical-align: baseline;
+    cursor: pointer;
+}
+
+.timer-chip.running {
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+}
+
+.timer-chip .chip-left {
+    font-size: 0.8em;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+}
+
+/* Running and finished timers, under the top bar on every screen. */
+.timer-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+}
+
+.timer {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1 1 15rem;
+    min-width: 0;
+    padding: 0.15rem 0.25rem 0.15rem 0.6rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 0.75rem;
+}
+
+.timer-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timer-left {
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.timer.finished {
+    border-color: var(--mud-palette-error);
+    background: var(--mud-palette-error);
+    color: var(--mud-palette-error-text);
+    animation: timer-flash 1s steps(2, jump-none) infinite;
+}
+
+.timer.finished .mud-button-root,
+.timer.finished .mud-icon-root {
+    color: inherit;
+}
+
+@keyframes timer-flash {
+    from { background: var(--mud-palette-error); color: var(--mud-palette-error-text); }
+    to { background: var(--mud-palette-surface); color: var(--mud-palette-error); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .timer.finished {
+        animation: none;
+    }
+}
+
 .step-label {
     display: block;
     color: var(--mud-palette-primary);

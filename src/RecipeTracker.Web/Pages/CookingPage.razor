@@ -1,8 +1,11 @@
 @page "/recipes/{RecipeId}/cook"
 @using RecipeTracker.Core.Cooking
+@using RecipeTracker.Core.Parsing
+@using RecipeTracker.Core.Ports
 @using RecipeTracker.Core.Quantities
 @implements IAsyncDisposable
 @inject AppCore App
+@inject IClock Clock
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -24,6 +27,33 @@
             }
         </div>
     </header>
+
+    @* Running and finished timers, on Gather and every Step. A finished one flashes and rings until dismissed. *@
+    @if (_session is { Timers.Count: > 0 } && _error is null)
+    {
+        var now = Clock.UtcNow;
+        <section class="timer-strip" aria-label="Timers">
+            @foreach (var timer in _session.Timers)
+            {
+                var done = timer.IsFinished(now);
+                <div class="timer @(done ? "finished" : "")" @key="timer.Id">
+                    <MudIcon Icon="@(done ? Icons.Material.Filled.AlarmOn : Icons.Material.Filled.Timer)" Size="Size.Small" />
+                    <span class="timer-label">@timer.Label</span>
+                    <span class="timer-left">@(done ? "Done" : timer.Countdown(now))</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => AddFiveAsync(timer.Id)" Class="timer-more">+5 min</MudButton>
+                    @if (done)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => RemoveTimerAsync(timer.Id)">Dismiss</MudButton>
+                    }
+                    else
+                    {
+                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Filled.Close" aria-label="@($"Cancel the {timer.Label} timer")"
+                                       OnClick="() => RemoveTimerAsync(timer.Id)" />
+                    }
+                </div>
+            }
+        </section>
+    }
 
     @if (_error is not null)
     {
@@ -129,7 +159,30 @@
                     <p class="step-faded step-before" @onclick="BackAsync">@steps[index - 1].Text</p>
                 }
                 <MudText Typo="Typo.overline" Class="step-label">Step @(index + 1)</MudText>
-                <p class="step-now">@step.Text</p>
+                @* Each time in the Step's text is a chip that starts a timer, and shows its time left while it runs. *@
+                <p class="step-now">
+                    @foreach (var (text, time) in Segments(step.Text))
+                    {
+                        if (time is null)
+                        {
+                            @text
+                        }
+                        else
+                        {
+                            var running = _session.Timers.FirstOrDefault(t => t.StepId == step.Id && t.TextStart == time.Start);
+                            <button type="button" class="timer-chip @(running is null ? "" : "running")"
+                                    aria-label="@(running is null ? $"Start a {time.Label} timer" : $"{time.Label} timer running")"
+                                    @onclick="() => StartTimerAsync(step.Id, time)">
+                                <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Small" />
+                                <span>@text</span>
+                                @if (running is not null)
+                                {
+                                    <span class="chip-left">@(running.IsFinished(Clock.UtcNow) ? "done" : running.Countdown(Clock.UtcNow))</span>
+                                }
+                            </button>
+                        }
+                    }
+                </p>
                 @if (uses.Count > 0)
                 {
                     <ul class="step-now-uses">
@@ -251,6 +304,113 @@
             {
                 // No Wake Lock here; the screen may sleep, and everything else still works.
             }
+
+            try
+            {
+                _alarm = await JS.InvokeAsync<IJSObjectReference>("import", "./js/timerAlarm.js");
+            }
+            catch (JSException)
+            {
+                // No alarm sound; finished timers still flash.
+            }
+
+            _ = TickAsync();
+        }
+    }
+
+    // Timers: the clock ticks once a second while any exist, and rings while any have finished.
+    private IJSObjectReference? _alarm;
+    private readonly CancellationTokenSource _closing = new();
+    private bool _ringing;
+
+    private async Task TickAsync()
+    {
+        using var ticker = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await ticker.WaitForNextTickAsync(_closing.Token))
+            {
+                if (_session is { Timers.Count: > 0 } || _ringing)
+                {
+                    await UpdateAlarmAsync();
+                    StateHasChanged();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Cooking Mode closed.
+        }
+    }
+
+    private async Task UpdateAlarmAsync()
+    {
+        var now = Clock.UtcNow;
+        var ring = _session?.Timers.Any(t => t.IsFinished(now)) == true;
+        if (ring == _ringing || _alarm is null)
+        {
+            return;
+        }
+
+        _ringing = ring;
+        try
+        {
+            await _alarm.InvokeVoidAsync(ring ? "start" : "stop");
+        }
+        catch (JSException)
+        {
+            // No sound; the timer still flashes.
+        }
+    }
+
+    private async Task StartTimerAsync(string stepId, StepDuration time)
+    {
+        // A tap, so the browser now lets the page make the alarm sound later.
+        if (_alarm is not null)
+        {
+            try
+            {
+                await _alarm.InvokeVoidAsync("prime");
+            }
+            catch (JSException)
+            {
+                // No sound.
+            }
+        }
+
+        await Change(() => App.Cooking.StartTimerAsync(RecipeId, stepId, time));
+    }
+
+    private async Task AddFiveAsync(string timerId)
+    {
+        await Change(() => App.Cooking.AddTimeAsync(RecipeId, timerId, TimeSpan.FromMinutes(5)));
+        await UpdateAlarmAsync();
+    }
+
+    private async Task RemoveTimerAsync(string timerId)
+    {
+        await Change(() => App.Cooking.RemoveTimerAsync(RecipeId, timerId));
+        await UpdateAlarmAsync();
+    }
+
+    /// <summary>The Step's text cut into plain text and the times found in it.</summary>
+    private static IEnumerable<(string Text, StepDuration? Time)> Segments(string text)
+    {
+        var at = 0;
+        foreach (var time in StepDurations.Find(text))
+        {
+            if (time.Start > at)
+            {
+                yield return (text[at..time.Start], null);
+            }
+
+            yield return (text.Substring(time.Start, time.Length), time);
+            at = time.Start + time.Length;
+        }
+
+        if (at < text.Length)
+        {
+            yield return (text[at..], null);
         }
     }
 
@@ -343,19 +503,27 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (_wakeLock is null)
-        {
-            return;
-        }
+        _closing.Cancel();
 
         try
         {
-            await _wakeLock.InvokeVoidAsync("release");
-            await _wakeLock.DisposeAsync();
+            if (_alarm is not null)
+            {
+                await _alarm.InvokeVoidAsync("stop");
+                await _alarm.DisposeAsync();
+            }
+
+            if (_wakeLock is not null)
+            {
+                await _wakeLock.InvokeVoidAsync("release");
+                await _wakeLock.DisposeAsync();
+            }
         }
         catch (JSDisconnectedException)
         {
-            // The page is closing; the browser releases the lock itself.
+            // The page is closing; the browser releases the lock and stops the sound itself.
         }
+
+        _closing.Dispose();
     }
 }

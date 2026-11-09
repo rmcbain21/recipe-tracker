@@ -1,3 +1,4 @@
+using RecipeTracker.Core.Parsing;
 using RecipeTracker.Core.Ports;
 using RecipeTracker.Core.Quantities;
 using RecipeTracker.Core.Recipes;
@@ -79,6 +80,55 @@ public sealed class CookingCatalogue
     /// <summary>Changes the Scale while cooking.</summary>
     public async Task<CookingSession> SetScaleAsync(string recipeId, Scale scale) =>
         await SaveAsync(await RequireAsync(recipeId) with { ScaleFactor = scale.Factor });
+
+    /// <summary>
+    /// Starts a timer from a time in a Step's text, at the low end of a range. Several can run at
+    /// once; tapping a time whose timer is already running doesn't start a second one.
+    /// </summary>
+    /// <exception cref="RuleViolationException">The Step is no longer in the Recipe.</exception>
+    public async Task<CookingSession> StartTimerAsync(string recipeId, string stepId, StepDuration duration)
+    {
+        var session = await RequireAsync(recipeId);
+        if (session.Timers.Any(t => t.StepId == stepId && t.TextStart == duration.Start))
+        {
+            return session;
+        }
+
+        var recipe = await _store.LoadAsync<Recipe>(RecipeCatalogue.Table, recipeId);
+        var stepNumber = recipe?.Steps.ToList().FindIndex(s => s.Id == stepId) + 1 ?? 0;
+        if (stepNumber == 0)
+        {
+            throw new RuleViolationException("That Step is no longer in the Recipe.");
+        }
+
+        var timer = new CookingTimer
+        {
+            Id = Guid.NewGuid().ToString(),
+            StepId = stepId,
+            TextStart = duration.Start,
+            Label = $"Step {stepNumber} · {StepDurations.Format(duration.Low)}",
+            EndsAt = _clock.UtcNow + duration.Low,
+        };
+        return await SaveAsync(session with { Timers = [.. session.Timers, timer] });
+    }
+
+    /// <summary>Adds time ("+5 min"). On a finished timer, it starts again from now.</summary>
+    public async Task<CookingSession> AddTimeAsync(string recipeId, string timerId, TimeSpan extra)
+    {
+        var session = await RequireAsync(recipeId);
+        var now = _clock.UtcNow;
+        var timers = session.Timers
+            .Select(t => t.Id == timerId ? t with { EndsAt = (t.EndsAt > now ? t.EndsAt : now) + extra } : t)
+            .ToList();
+        return await SaveAsync(session with { Timers = timers });
+    }
+
+    /// <summary>Cancels a running timer or dismisses a finished one.</summary>
+    public async Task<CookingSession> RemoveTimerAsync(string recipeId, string timerId)
+    {
+        var session = await RequireAsync(recipeId);
+        return await SaveAsync(session with { Timers = session.Timers.Where(t => t.Id != timerId).ToList() });
+    }
 
     /// <summary>Ends the Cooking Session, so that cooking again starts fresh.</summary>
     public async Task EndAsync(string recipeId)
