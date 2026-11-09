@@ -1,5 +1,6 @@
 @page "/recipes/{RecipeId}"
 @using RecipeTracker.Core.Recipes
+@using RecipeTracker.Core.Quantities
 @inject AppCore App
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
@@ -78,7 +79,7 @@ else
         <div class="d-flex flex-wrap gap-4 mb-3 recipe-facts">
             @if (recipe.Yield is not null)
             {
-                @Fact("Makes", recipe.Yield.ToString())
+                @Fact("Makes", _view.YieldText!)
             }
             @if (recipe.StatedTimes.PrepMinutes is int prep)
             {
@@ -91,6 +92,30 @@ else
             @if (recipe.StatedTimes.TotalMinutes is int total)
             {
                 @Fact("Total", StatedTimes.Format(total))
+            }
+        </div>
+    }
+
+    @if (recipe.Lines.Any(line => line.Quantity is not null))
+    {
+        <div class="d-flex flex-wrap align-center gap-1 mb-2 scale-control" role="group" aria-label="Scale">
+            <MudText Typo="Typo.caption" Class="mud-text-secondary mr-1">Scale</MudText>
+            @foreach (var preset in Scale.Presets)
+            {
+                var chosen = _scale == preset;
+                <MudChip T="string" Size="Size.Small" Class="ml-0 scale-preset" Color="@(chosen ? Color.Primary : Color.Default)"
+                         Variant="@(chosen ? Variant.Filled : Variant.Outlined)" aria-pressed="@(chosen ? "true" : "false")"
+                         OnClick="() => SetScale(preset)">@preset.Label</MudChip>
+            }
+            @if (recipe.Yield is { Amount: > 0 } yield)
+            {
+                <span class="d-inline-flex align-center gap-1 ml-1 scale-yield">
+                    <MudText Typo="Typo.body2">Make</MudText>
+                    <MudNumericField T="decimal?" Value="ScaledYieldAmount(yield)" ValueChanged="v => ScaleToYield(yield, v)"
+                                     Min="0" HideSpinButtons="true" Margin="Margin.Dense" Variant="Variant.Outlined" Format="0.##"
+                                     Class="field-yield" aria-label="@($"Make how many {yield.Label}")" />
+                    <MudText Typo="Typo.body2">@yield.Label</MudText>
+                </span>
             }
         </div>
     }
@@ -136,11 +161,31 @@ else
     public string RecipeId { get; set; } = "";
 
     private RecipeView? _view;
+
+    // The Scale is only for this visit to the page: it's never saved, and opening the page resets it.
+    private Scale _scale = Scale.One;
+
+    private void SetScale(Scale scale)
+    {
+        _scale = scale;
+        _view = _view!.AtScale(scale);
+    }
+
+    private decimal? ScaledYieldAmount(Yield yield) => Math.Round(yield.Amount!.Value * _scale.Factor, 2);
+
+    private void ScaleToYield(Yield yield, decimal? target)
+    {
+        if (target is > 0)
+        {
+            SetScale(Scale.ToYield(yield, target.Value));
+        }
+    }
     private bool _loaded;
 
     protected override async Task OnParametersSetAsync()
     {
-        _view = await App.Recipes.GetRecipeAsync(RecipeId);
+        _scale = Scale.One;
+        _view = (await App.Recipes.GetRecipeAsync(RecipeId))?.AtScale(_scale);
         _loaded = true;
     }
 
@@ -257,7 +302,7 @@ else
             Snackbar.Add(ex.Message, Severity.Warning);
         }
 
-        _view = await App.Recipes.GetRecipeAsync(RecipeId);
+        _view = (await App.Recipes.GetRecipeAsync(RecipeId))?.AtScale(_scale);
     }
 
     private static RenderFragment Fact(string label, string value) => __builder =>

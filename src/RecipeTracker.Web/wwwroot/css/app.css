@@ -281,3 +281,13 @@ h1:focus {
     min-height: 2.25rem;
     border-top: 1px solid var(--mud-palette-lines-default);
 }
+
+/* The Scale control's "Make [6] servings" box stays small. */
+.field-yield {
+    width: 4.5rem;
+    flex: 0 0 4.5rem;
+}
+
+.field-yield .mud-input-control {
+    margin-top: 0;
+}

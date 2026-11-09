@@ -1,15 +1,19 @@
 using RecipeTracker.Core.Books;
 using RecipeTracker.Core.Ingredients;
 using RecipeTracker.Core.Organizing;
+using RecipeTracker.Core.Quantities;
 
 namespace RecipeTracker.Core.Recipes;
 
 /// <summary>A Recipe as its recipe page shows it: ingredients grouped by section, with their Ingredients' names.</summary>
 public sealed class RecipeView
 {
-    internal RecipeView(Recipe recipe, IReadOnlyDictionary<string, Ingredient> ingredients, Book? book, IReadOnlyList<GroupedTags<Tag>> tags)
+    internal RecipeView(Recipe recipe, IReadOnlyDictionary<string, Ingredient> ingredients, Book? book, IReadOnlyList<GroupedTags<Tag>> tags, Scale? scale = null)
     {
         Recipe = recipe;
+        Scale = scale ?? Scale.One;
+        _ingredients = ingredients;
+        _book = book;
         Tags = tags;
         Source = ShowSource(recipe.Source, book);
 
@@ -30,7 +34,19 @@ public sealed class RecipeView
         Ingredients = groups;
     }
 
+    private readonly IReadOnlyDictionary<string, Ingredient> _ingredients;
+    private readonly Book? _book;
+
     public Recipe Recipe { get; }
+
+    /// <summary>The Scale every quantity is shown at; ×1 unless <see cref="AtScale"/> chose another.</summary>
+    public Scale Scale { get; }
+
+    /// <summary>The same Recipe with every line's and Ingredient Use's quantity shown at another Scale.</summary>
+    public RecipeView AtScale(Scale scale) => new(Recipe, _ingredients, _book, Tags, scale);
+
+    /// <summary>The Yield at the Scale, such as "6 servings (×1½)", or null if the Recipe has none.</summary>
+    public string? YieldText => Recipe.Yield is null ? null : Scale.Format(Recipe.Yield);
 
     /// <summary>
     /// The Ingredient Uses shown under a Step, such as "butter, 2 tbsp" or "sugar, ½ cup (of 1 cup)".
@@ -59,8 +75,8 @@ public sealed class RecipeView
             ? char.ToLowerInvariant(amount[0]) + amount[1..]
             : amount;
 
-    private static string Amount(Quantities.Quantity? quantity, string unit) =>
-        string.Join(" ", new[] { quantity?.ToString(), unit }.Where(part => !string.IsNullOrEmpty(part)));
+    private string Amount(Quantity? quantity, string unit) =>
+        string.Join(" ", new[] { quantity is null ? null : Scale.Format(quantity), unit }.Where(part => !string.IsNullOrEmpty(part)));
 
     /// <summary>The Recipe's Tags, by Tag Group in the Cook's order, ungrouped last; groups it has no Tags in are left out.</summary>
     public IReadOnlyList<GroupedTags<Tag>> Tags { get; }
@@ -90,7 +106,7 @@ public sealed class RecipeView
     /// <summary>The Ingredient Lines grouped as shown: the lines with no section first (when there are any), then each section.</summary>
     public IReadOnlyList<IngredientGroup> Ingredients { get; }
 
-    private static ShownLine ShowLine(IngredientLine line, IReadOnlyDictionary<string, Ingredient> ingredients)
+    private ShownLine ShowLine(IngredientLine line, IReadOnlyDictionary<string, Ingredient> ingredients)
     {
         var name = line.IngredientId is null ? line.SuggestedName
             : ingredients.TryGetValue(line.IngredientId, out var ingredient) ? ingredient.Name
