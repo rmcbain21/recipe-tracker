@@ -1,16 +1,27 @@
 @page "/"
+@using RecipeTracker.Core.Organizing
 @inject AppCore App
 @inject NavigationManager Navigation
 
 <PageTitle>Recipes</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4" tabindex="-1" HtmlTag="h1">Recipes</MudText>
+<div class="d-flex align-center mb-2">
+    <MudText Typo="Typo.h5" Class="flex-grow-1" tabindex="-1" HtmlTag="h1">Recipes</MudText>
+    <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="sort-menu"
+             Label="@SortName(_query.Sort)" StartIcon="@Icons.Material.Filled.Sort" Size="Size.Small" AriaLabel="@($"Sort: {SortName(_query.Sort)}")">
+        @foreach (var sort in Enum.GetValues<RecipeSort>())
+        {
+            <MudMenuItem OnClick="() => SetQueryAsync(_query with { Sort = sort })"
+                         Icon="@(sort == _query.Sort ? Icons.Material.Filled.Check : null)">@SortName(sort)</MudMenuItem>
+        }
+    </MudMenu>
+</div>
 
-@if (_recipes is null)
+@if (_list is null)
 {
     <MudProgressLinear Indeterminate="true" />
 }
-else if (_recipes.Count == 0)
+else if (_list.TotalRecipes == 0)
 {
     <MudPaper Class="pa-6 d-flex flex-column align-center gap-2" Elevation="0" Outlined="true">
         <MudIcon Icon="@Icons.Material.Filled.MenuBook" Size="Size.Large" Color="Color.Primary" />
@@ -20,30 +31,144 @@ else if (_recipes.Count == 0)
 }
 else
 {
-    <MudPaper>
-        <MudList T="string">
-            @foreach (var recipe in _recipes)
+    <MudTextField T="string" Value="_query.Search" ValueChanged="s => SetQueryAsync(_query with { Search = s ?? string.Empty })"
+                  Placeholder="Search titles, ingredients, notes" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Immediate="true" DebounceInterval="250"
+                  Class="mb-2 recipe-search" aria-label="Search Recipes" />
+
+    <div class="d-flex align-center gap-2 mb-2">
+        <MudBadge Content="_query.FilterCount" Visible="_query.FilterCount > 0" Color="Color.Primary" Overlap="true">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FilterList" OnClick="OpenFiltersAsync" Class="open-filters">Filters</MudButton>
+        </MudBadge>
+        <MudButton Variant="Variant.Outlined" Disabled="!_list.CanSurprise" OnClick="Surprise" Class="surprise-me">🎲 Surprise me</MudButton>
+        <span class="flex-grow-1"></span>
+        @if (!_query.IsEverything)
+        {
+            <MudText Typo="Typo.caption" Class="mud-text-secondary list-count">@_list.Rows.Count of @_list.TotalRecipes</MudText>
+        }
+    </div>
+
+    @if (_active.Count > 0)
+    {
+        <div class="d-flex flex-wrap align-center gap-1 mb-2 active-filters">
+            @foreach (var filter in _active)
             {
-                <MudListItem T="string" Href="@($"recipes/{recipe.Id}")">
-                    <div class="d-flex align-center gap-2">
-                        <span>@recipe.Title</span>
-                        @if (recipe.IsDraft)
-                        {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Class="draft-chip">Draft</MudChip>
-                        }
-                    </div>
-                </MudListItem>
-                <MudDivider />
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                         OnClose="() => SetQueryAsync(filter.Without)" Class="ml-0">@filter.Label</MudChip>
             }
-        </MudList>
-    </MudPaper>
+            @if (_active.Count > 1)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => SetQueryAsync(_query.Cleared())">Clear all</MudButton>
+            }
+        </div>
+    }
+
+    @if (_list.Rows.Count == 0)
+    {
+        <MudPaper Class="pa-6 d-flex flex-column align-center gap-2" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.body1">No Recipes match.</MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="() => SetQueryAsync(_query.Cleared())">Clear filters</MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper>
+            <ul class="recipe-rows">
+                @foreach (var row in _list.Rows)
+                {
+                    var details = Details(row);
+                    <li @key="row.Id">
+                        <a href="@($"recipes/{row.Id}")" class="recipe-row">
+                            <span class="d-flex align-center gap-2">
+                                <span class="recipe-row-title">@row.Title</span>
+                                @if (row.IsDraft)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Class="draft-chip">Draft</MudChip>
+                                }
+                            </span>
+                            @if (details.Length > 0)
+                            {
+                                <span class="recipe-row-details">@details</span>
+                            }
+                            @if (row.TagNames.Count > 0)
+                            {
+                                <span class="recipe-row-tags">
+                                    @foreach (var tag in row.TagNames)
+                                    {
+                                        <span class="recipe-row-tag">@tag</span>
+                                    }
+                                </span>
+                            }
+                        </a>
+                    </li>
+                }
+            </ul>
+        </MudPaper>
+    }
+
+    <FilterSheet @bind-Open="_filtersOpen" Query="_query" QueryChanged="SetQueryAsync" Options="_options" MatchCount="_list.Rows.Count" />
 }
 
 <MudFab Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Add" Class="add-fab" aria-label="New Recipe"
         OnClick="@(() => Navigation.NavigateTo("capture"))" />
 
 @code {
-    private IReadOnlyList<Recipe>? _recipes;
+    private RecipeQuery _query = RecipeQuery.Everything;
+    private RecipeList? _list;
+    private IReadOnlyList<ActiveFilter> _active = [];
+    private RecipeFilterOptions _options = new([], []);
+    private bool _filtersOpen;
 
-    protected override async Task OnInitializedAsync() => _recipes = await App.Recipes.ListRecipesAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _query = await App.Finder.GetSavedQueryAsync();
+        await RefreshAsync();
+    }
+
+    // Every change is remembered on this device, so the list opens the same way after a reload.
+    private async Task SetQueryAsync(RecipeQuery query)
+    {
+        _query = query;
+        await RefreshAsync();
+        await App.Finder.SaveQueryAsync(query);
+    }
+
+    private async Task RefreshAsync()
+    {
+        _list = await App.Finder.FindAsync(_query);
+        _active = await App.Finder.DescribeAsync(_query);
+        if (_filtersOpen)
+        {
+            _options = await App.Finder.GetFilterOptionsAsync(_query);
+        }
+    }
+
+    private async Task OpenFiltersAsync()
+    {
+        _options = await App.Finder.GetFilterOptionsAsync(_query);
+        _filtersOpen = true;
+    }
+
+    private void Surprise()
+    {
+        if (_list?.Surprise(Random.Shared) is { } row)
+        {
+            Navigation.NavigateTo($"recipes/{row.Id}");
+        }
+    }
+
+    private static string SortName(RecipeSort sort) => sort switch
+    {
+        RecipeSort.RecentlyAdded => "Recently added",
+        RecipeSort.RecentlyCooked => "Recently cooked",
+        _ => "Title",
+    };
+
+    // "example.com · 45 min · cooked 4 Nov"
+    private static string Details(RecipeRow row) => string.Join(" · ", new[]
+    {
+        row.SourceName,
+        row.TotalTimeText,
+        row.LastCooked is { } last ? $"cooked {last.ToString(last.Year == DateTime.Today.Year ? "d MMM" : "d MMM yyyy")}" : null,
+    }.Where(part => part is not null));
 }

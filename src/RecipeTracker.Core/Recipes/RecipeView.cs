@@ -141,7 +141,7 @@ public sealed class RecipeView
     /// <summary>The Source as shown after "From", or null if the Recipe has none.</summary>
     public ShownSource? Source { get; }
 
-    private static ShownSource? ShowSource(Source? source, Book? book) => source switch
+    internal static ShownSource? ShowSource(Source? source, Book? book) => source switch
     {
         null => null,
         { Kind: SourceKind.Book } => new ShownSource(SourceKind.Book, book?.Title ?? "Unknown Book", null, source.Page),

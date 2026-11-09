@@ -21,11 +21,15 @@ public sealed class AppCore
         Ingredients = new IngredientCatalogue(store);
         Books = new BookCatalogue(store, clock);
         Tags = new TagCatalogue(store, clock);
+        Finder = new RecipeFinder(store, clock, Tags);
         Cooking = new CookingCatalogue(store, clock);
         Settings = new UserSettings(store, clock);
     }
 
     public TagCatalogue Tags { get; }
+
+    /// <summary>The home list: search, filters, sort and Surprise me.</summary>
+    public RecipeFinder Finder { get; }
 
     public CookingCatalogue Cooking { get; }
 

@@ -24,3 +24,5 @@
 - Ten food palettes (`Web/Layout/AppThemes.cs`): Paprika (default), Basil & Tomato, Saffron, Blueberry, Matcha, Espresso, Plum, Citrus, Cast Iron, Lavender & Honey. Five text sizes, including Extra large (125%). MainLayout applies them through `ThemeState`. After a sync, MainLayout should reload `Settings` and call `ThemeState.Set`, as Backpacking Tracker does.
 
 **2026-11-09 (agent, from 11):** New synced table `cookLog` (`CookingCatalogue.CookLogTable`) holds Cook Log Entries. Add it to the sync table list and to the JSON backup. Deleting a Recipe tombstones its entries, so the tombstones need to sync too.
+
+**2026-11-09 (agent, from 14):** The home list's search, filters and sort are kept in the **device-only** `homeQuery` table (`RecipeFinder.QueryTable`). Leave it out of sync and backup, like `cookingSessions` and `deviceSettings`.

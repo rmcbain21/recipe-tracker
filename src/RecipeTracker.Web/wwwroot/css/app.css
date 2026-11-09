@@ -702,3 +702,118 @@ h1:focus {
     padding-left: 1.6rem;
     border-bottom: 1px solid var(--mud-palette-lines-default);
 }
+
+/* The home list. */
+.recipe-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.recipe-rows li + li {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.recipe-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.7rem 1rem;
+    color: inherit;
+    text-decoration: none;
+}
+
+.recipe-row:hover,
+.recipe-row:focus-visible {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.recipe-row-title {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.recipe-row-details {
+    font-size: 0.85rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.recipe-row-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.recipe-row-tag {
+    padding: 0 0.45rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+/* The filter sheet slides up from the bottom, over the bottom navigation. */
+.sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1390;
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.filter-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1400;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    margin: 0 auto;
+    max-width: 40rem;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 1rem 1rem 0 0;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.filter-sheet-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+}
+
+.filter-row-name {
+    margin: 0.75rem 0 0.35rem 0;
+}
+
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.filter-books {
+    margin-top: 0.4rem;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    min-height: 2.25rem;
+    padding: 0 0.85rem;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.filter-chip.on {
+    border-color: var(--mud-palette-primary);
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+}
